@@ -499,7 +499,7 @@ async function renderMenuList(delivery) {
               <span class="meta price-row"><span class="one">Food cost ${cost != null ? eur(cost) : '—'}${missing ? ` · ${missing} bez cijene` : ''}</span>${factorBadge(price, d.vat_rate, cost)}</span>
             </span>
           </button>`;
-        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan.'}</div>${delivery ? '' : `<div class="actions"><button class="btn tap" data-go="/jelovnik/skeniraj">Skeniraj jelovnik</button><p class="muted small center" style="margin:4px 0 0">Slikaj jelovnik, a aplikacija sama upiše jela, kategorije i cijene. Ili dodaj jelo ručno na +.</p></div>`}`}
+        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan.'}</div>${delivery ? '' : `<div class="actions"><button class="btn tap" data-go="/jelovnik/skeniraj">Učitaj jelovnik iz PDF-a</button><p class="muted small center" style="margin:4px 0 0">Aplikacija sama upiše jela, kategorije i cijene iz PDF-a. Ili dodaj jelo ručno na +.</p></div>`}`}
       ${list.length ? '<p class="muted small" style="margin:16px 4px">Faktor = prodajna cijena bez PDV-a / nabavna cijena sastojaka. Cilj je iznad 3x.</p>' : ''}`;
     screen({ title: delivery ? 'Jelovnik - Dostava' : 'Jelovnik', back: '/restoran', action: '/jelo/new', body });
   } catch (e) { failed(title, '/restoran', e); }
@@ -652,64 +652,128 @@ async function renderDishForm(id) {
   };
 }
 
-/* ---------- SKENIRANJE JELOVNIKA ---------- */
-function shrinkImage(file, max = 1600) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      resolve({ media_type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] });
-    };
-    img.onerror = () => reject(new Error('Slika se ne može otvoriti.'));
-    img.src = URL.createObjectURL(file);
-  });
+/* ---------- JELOVNIK IZ PDF-a (čita se na uređaju, besplatno) ---------- */
+const PRICE_RE = /(?:€\s*)?\d{1,4}[.,]\d{1,2}\s*(?:€|eur(?:a|o)?\b)?|(?:€\s*)\d{1,4}\b|\b\d{1,4}\s*(?:€|eur(?:a|o)?\b)/gi;
+
+// cijene u retku; broj iza kojeg ide mjerna jedinica (0,5 l, 200 g) nije cijena
+function findPrices(t) {
+  const all = [...t.matchAll(PRICE_RE)].filter((m) => !/^\s*(l|ml|cl|dl|kg|g|dag|kom|x)\b/i.test(t.slice(m.index + m[0].length)));
+  const withCur = all.filter((m) => /€|eur/i.test(m[0]));
+  return withCur.length ? withCur : all;
 }
 
-async function functionError(error) {
-  try { const b = await error.context.json(); if (b?.error) return b.error; } catch { /* nije JSON */ }
-  return errText(error);
+async function pdfLines(file) {
+  const pdfjs = await import('./vendor/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL('vendor/pdf.worker.min.mjs', location.href).href;
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const out = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const width = page.getViewport({ scale: 1 }).width;
+    const tc = await page.getTextContent();
+    const rows = [];
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
+      let r = rows.find((r) => Math.abs(r.y - y) < Math.max(2, Math.min(r.h, h) * 0.5));
+      if (!r) rows.push((r = { y, h, items: [] }));
+      r.h = Math.max(r.h, h);
+      r.items.push({ x, w: it.width, s: it.str, h });
+    }
+    // red -> segmenti; veliki razmak dijeli stupce, osim kad je desno samo cijena
+    const rowSegs = [];
+    for (const r of rows) {
+      const segs = [];
+      r.items.sort((a, b) => a.x - b.x);
+      let cur = null;
+      for (const it of r.items) {
+        const gap = cur ? it.x - cur.end : 0;
+        const isPrice = /^\s*[.\s_]*(€\s*)?\d{1,4}([.,]\d{1,2})?\s*(€|eur)?\s*$/i.test(it.s);
+        if (cur && gap > r.h * 4 && !isPrice) { segs.push(cur); cur = null; }
+        if (!cur) cur = { x: it.x, y: r.y, h: 0, text: '', end: it.x };
+        else if (gap > r.h * 0.2 && !cur.text.endsWith(' ')) cur.text += ' ';
+        cur.text += it.s;
+        cur.h = Math.max(cur.h, it.h);
+        cur.end = it.x + (it.w || 0);
+      }
+      if (cur) segs.push(cur);
+      rowSegs.push(segs);
+    }
+    // dva stupca samo ako više redova ima po dvije stavke s cijenom
+    const hasPrice = (t) => findPrices(t).length > 0;
+    const twoCols = rowSegs.filter((sg) => sg.filter((x) => hasPrice(x.text)).length >= 2).length >= 2;
+    const segs = twoCols ? rowSegs.flat() : rowSegs.map((sg) => sg.reduce((a, b) => ({ ...a, text: `${a.text} ${b.text}`, h: Math.max(a.h, b.h) })));
+    segs.sort((a, b) => (twoCols ? (a.x > width * 0.45) - (b.x > width * 0.45) : 0) || b.y - a.y || a.x - b.x);
+    segs.forEach((s) => out.push({ text: s.text.replace(/\s+/g, ' ').trim(), h: s.h }));
+  }
+  return out.filter((l) => l.text);
+}
+
+function parseMenuLines(lines) {
+  const priced = lines.filter((l) => findPrices(l.text).length);
+  const hs = priced.map((l) => l.h).sort((a, b) => a - b);
+  const dishH = hs.length ? hs[Math.floor(hs.length / 2)] : 10;
+  const toNum = (t) => Number(t.replace(/[^\d,.]/g, '').replace(',', '.'));
+  const dishes = [];
+  let cat = null, last = null;
+  lines.forEach((l, i) => {
+    const t = l.text;
+    const found = findPrices(t);
+    const prices = found.map((m) => m[0]);
+    if (prices.length) {
+      const first = found[0].index;
+      let name = t.slice(0, first).replace(/[\s.…_–—-]+$/, '').trim();
+      const rest = t.slice(first + prices[0].length).replace(/^[\s/|.…]+/, '').trim();
+      if (!name && last && last.price == null) { last.price = toNum(prices[0]); return; } // cijena u svom redu
+      if (!name) return;
+      last = { category: cat || 'Ostalo', name, description: prices.length > 1 ? rest : '', price: toNum(prices[0]) };
+      dishes.push(last);
+      return;
+    }
+    const letters = t.replace(/[^A-Za-zČĆŽŠĐčćžšđ]/g, '');
+    const caps = letters.length >= 3 && letters === letters.toUpperCase();
+    const big = l.h > dishH * 1.2;
+    const nextPriced = lines[i + 1] && findPrices(lines[i + 1].text).length;
+    const looksTitle = t.length <= 30 && !t.includes(',') && /^[A-ZČĆŽŠĐ]/.test(t) && nextPriced && (!last || last.category !== cat || (last.description && true));
+    if (big || caps || (!last && t.length <= 40) || looksTitle) {
+      cat = t.replace(/\s*[:–-]\s*$/, '');
+      last = null;
+      return;
+    }
+    if (last) last.description = last.description ? `${last.description} ${t}` : t;
+  });
+  const nice = (c) => (c === c.toUpperCase() ? c.charAt(0) + c.slice(1).toLowerCase() : c);
+  return dishes.map((d) => ({ ...d, category: nice(d.category) }));
 }
 
 function renderScanMenu() {
   screen({
-    title: 'Skeniraj jelovnik', back: '/jelovnik',
+    title: 'Jelovnik iz PDF-a', back: '/jelovnik',
     body: `
-      <p class="muted" style="margin:0 4px 14px">Slikaj ili odaberi slike jelovnika, svaku stranicu posebno (najviše 8). Prije spremanja sve možeš pregledati i ispraviti.</p>
+      <p class="muted" style="margin:0 4px 14px">Odaberi PDF jelovnika. Aplikacija iz njega izvuče kategorije, jela, opise i cijene, a ti prije spremanja sve pregledaš i ispraviš. Besplatno je i radi na mobitelu.</p>
       <label class="btn secondary tap center" style="display:block;color:var(--accent);font-size:17px">
-        Odaberi ili slikaj stranice
-        <input id="files" type="file" accept="image/*" multiple hidden>
+        <span id="fname">Odaberi PDF jelovnika</span>
+        <input id="file" type="file" accept="application/pdf,.pdf" hidden>
       </label>
-      <div id="thumbs" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px"></div>
-      <div class="err" id="err" style="margin-top:8px"></div>
-      <button class="btn tap" id="go" disabled style="margin-top:8px">Skeniraj</button>`,
+      <div class="err" id="err" style="margin-top:10px"></div>`,
   });
-  let files = [];
-  const input = document.getElementById('files');
-  const goBtn = document.getElementById('go');
-  input.onchange = () => {
-    files = [...files, ...input.files].slice(0, 8);
-    input.value = '';
-    document.getElementById('thumbs').innerHTML = files.map((f) => `<img src="${URL.createObjectURL(f)}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px">`).join('');
-    goBtn.disabled = !files.length;
-    goBtn.textContent = `Skeniraj ${files.length} ${plural(files.length, 'stranicu', 'stranice', 'stranica')}`;
-  };
-  goBtn.onclick = async () => {
+  const input = document.getElementById('file');
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
     const err = document.getElementById('err');
     err.textContent = '';
-    goBtn.disabled = true; goBtn.textContent = 'Čitam jelovnik… (može potrajati do minute)';
+    document.getElementById('fname').textContent = 'Čitam jelovnik…';
     try {
-      const images = await Promise.all(files.map((f) => shrinkImage(f)));
-      const { data, error } = await sb.functions.invoke('scan-menu', { body: { images } });
-      if (error) throw new Error(await functionError(error));
-      if (!data?.dishes?.length) throw new Error('Na slikama nisam našao jela. Probaj oštriju sliku.');
-      renderScanReview(data.dishes);
+      const lines = await pdfLines(file);
+      if (!lines.length) throw new Error('Ovaj PDF je slika (sken), pa iz njega nema teksta za pročitati. Treba PDF izvezen iz programa u kojem je jelovnik napravljen.');
+      const dishes = parseMenuLines(lines);
+      if (!dishes.length) throw new Error('U PDF-u nisam našao jela s cijenama. Jela možeš dodati ručno na +.');
+      renderScanReview(dishes);
     } catch (e) {
       err.textContent = errText(e);
-      goBtn.disabled = false; goBtn.textContent = 'Pokušaj ponovno';
+      document.getElementById('fname').textContent = 'Odaberi drugi PDF';
+      input.value = '';
     }
   };
 }
