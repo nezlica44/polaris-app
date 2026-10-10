@@ -482,7 +482,7 @@ async function renderMenuList(delivery) {
   const title = delivery ? 'Dostava' : 'Jelovnik';
   loading(title, '/restoran');
   try {
-    const rows = await q(sb.from('dishes').select('*, dish_ingredients(qty, unit, items(price_net, unit))').order('category', { nullsFirst: false }).order('name'));
+    const rows = await q(sb.from('dishes').select('*, dish_ingredients(qty, unit, items(price_net, unit))').order('sort').order('name'));
     const list = delivery ? rows.filter((d) => d.on_delivery) : rows;
     const groups = {};
     list.forEach((d) => { (groups[d.category || 'Ostalo'] ||= []).push(d); });
@@ -499,8 +499,8 @@ async function renderMenuList(delivery) {
               <span class="meta price-row"><span class="one">Food cost ${cost != null ? eur(cost) : '—'}${missing ? ` · ${missing} bez cijene` : ''}</span>${factorBadge(price, d.vat_rate, cost)}</span>
             </span>
           </button>`;
-        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan. Dodaj jelo na +'}</div>`}
-      <p class="muted small" style="margin:16px 4px">Faktor = prodajna cijena bez PDV-a / nabavna cijena sastojaka. Cilj je iznad 3x.</p>`;
+        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan.'}</div>${delivery ? '' : `<div class="actions"><button class="btn tap" data-go="/jelovnik/skeniraj">Skeniraj jelovnik</button><p class="muted small center" style="margin:4px 0 0">Slikaj jelovnik, a aplikacija sama upiše jela, kategorije i cijene. Ili dodaj jelo ručno na +.</p></div>`}`}
+      ${list.length ? '<p class="muted small" style="margin:16px 4px">Faktor = prodajna cijena bez PDV-a / nabavna cijena sastojaka. Cilj je iznad 3x.</p>' : ''}`;
     screen({ title: delivery ? 'Jelovnik - Dostava' : 'Jelovnik', back: '/restoran', action: '/jelo/new', body });
   } catch (e) { failed(title, '/restoran', e); }
 }
@@ -519,6 +519,7 @@ async function renderDish(id) {
           <div class="muted small">${esc(d.category || 'Bez kategorije')} · PDV ${num(d.vat_rate ?? 0, 1)}%</div>
           ${priceLine('Restoran', d.price)}
           ${d.on_delivery ? priceLine('Dostava', d.delivery_price) : ''}
+          ${d.description ? `<div class="muted small" style="margin-top:10px;white-space:pre-wrap">${esc(d.description)}</div>` : ''}
         </div>
         <div class="section-title">Normativ za 1 porciju</div>
         <div class="group">
@@ -562,6 +563,7 @@ async function renderDishForm(id) {
       <form id="f">
         <label>Naziv jela<input name="name" value="${esc(d.name)}" required></label>
         <label>Kategorija<input name="category" value="${esc(d.category)}" placeholder="npr. Roštilj, Pizze, Salate"></label>
+        <label>Opis na jelovniku<input name="description" value="${esc(d.description)}" placeholder="npr. 10 kom, lepinja, luk, kajmak"></label>
         <div class="grid2">
           <label>Cijena s PDV-om (€)<input name="price" inputmode="decimal" value="${esc(d.price)}"></label>
           <label>PDV<select name="vat_rate">${[13, 25, 5, 0].map((v) => `<option value="${v}" ${Number(d.vat_rate) === v ? 'selected' : ''}>${v}%</option>`).join('')}</select></label>
@@ -599,7 +601,7 @@ async function renderDishForm(id) {
     e.preventDefault();
     const err = document.getElementById('err');
     const row = {
-      name: val(f, 'name'), category: val(f, 'category'), price: numVal(f, 'price'), vat_rate: numVal(f, 'vat_rate'),
+      name: val(f, 'name'), category: val(f, 'category'), description: val(f, 'description'), price: numVal(f, 'price'), vat_rate: numVal(f, 'vat_rate'),
       on_delivery: f.on_delivery.checked, delivery_price: numVal(f, 'delivery_price'), recipe: val(f, 'recipe'),
     };
     const lines = [];
@@ -627,6 +629,128 @@ async function renderDishForm(id) {
   if (del) del.onclick = async () => {
     if (!confirm('Obrisati jelo?')) return;
     try { await q(sb.from('dishes').delete().eq('id', id)); toast('Obrisano'); go('/jelovnik'); } catch (e2) { toast(errText(e2)); }
+  };
+}
+
+/* ---------- SKENIRANJE JELOVNIKA ---------- */
+function shrinkImage(file, max = 1600) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve({ media_type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] });
+    };
+    img.onerror = () => reject(new Error('Slika se ne može otvoriti.'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function functionError(error) {
+  try { const b = await error.context.json(); if (b?.error) return b.error; } catch { /* nije JSON */ }
+  return errText(error);
+}
+
+function renderScanMenu() {
+  screen({
+    title: 'Skeniraj jelovnik', back: '/jelovnik',
+    body: `
+      <p class="muted" style="margin:0 4px 14px">Slikaj ili odaberi slike jelovnika, svaku stranicu posebno (najviše 8). Prije spremanja sve možeš pregledati i ispraviti.</p>
+      <label class="btn secondary tap center" style="display:block;color:var(--accent);font-size:17px">
+        Odaberi ili slikaj stranice
+        <input id="files" type="file" accept="image/*" multiple hidden>
+      </label>
+      <div id="thumbs" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px"></div>
+      <div class="err" id="err" style="margin-top:8px"></div>
+      <button class="btn tap" id="go" disabled style="margin-top:8px">Skeniraj</button>`,
+  });
+  let files = [];
+  const input = document.getElementById('files');
+  const goBtn = document.getElementById('go');
+  input.onchange = () => {
+    files = [...files, ...input.files].slice(0, 8);
+    input.value = '';
+    document.getElementById('thumbs').innerHTML = files.map((f) => `<img src="${URL.createObjectURL(f)}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px">`).join('');
+    goBtn.disabled = !files.length;
+    goBtn.textContent = `Skeniraj ${files.length} ${plural(files.length, 'stranicu', 'stranice', 'stranica')}`;
+  };
+  goBtn.onclick = async () => {
+    const err = document.getElementById('err');
+    err.textContent = '';
+    goBtn.disabled = true; goBtn.textContent = 'Čitam jelovnik… (može potrajati do minute)';
+    try {
+      const images = await Promise.all(files.map((f) => shrinkImage(f)));
+      const { data, error } = await sb.functions.invoke('scan-menu', { body: { images } });
+      if (error) throw new Error(await functionError(error));
+      if (!data?.dishes?.length) throw new Error('Na slikama nisam našao jela. Probaj oštriju sliku.');
+      renderScanReview(data.dishes);
+    } catch (e) {
+      err.textContent = errText(e);
+      goBtn.disabled = false; goBtn.textContent = 'Pokušaj ponovno';
+    }
+  };
+}
+
+function renderScanReview(dishes) {
+  const groups = [];
+  dishes.forEach((d, i) => {
+    const cat = (d.category || 'Ostalo').trim();
+    let g = groups.find((x) => x.cat === cat);
+    if (!g) groups.push((g = { cat, items: [] }));
+    g.items.push({ ...d, i });
+  });
+  screen({
+    title: 'Provjeri jela', back: '/jelovnik/skeniraj',
+    body: `
+      <p class="muted" style="margin:0 4px 6px">Pronađeno ${dishes.length} ${plural(dishes.length, 'jelo', 'jela', 'jela')}. Ispravi što treba, makni kvačicu s onoga što ne želiš, pa spremi.</p>
+      <form id="f">
+        ${groups.map((g, gi) => `
+          <div>
+            <div class="section-title" style="margin-top:14px">Kategorija</div>
+            <input name="cat_${gi}" value="${esc(g.cat)}" style="font-weight:700">
+            <div class="group" style="margin-top:8px">
+              ${g.items.map((d) => `
+                <div class="cell static" style="gap:10px;align-items:flex-start" data-row="${d.i}" data-g="${gi}">
+                  <input type="checkbox" name="on_${d.i}" checked style="margin-top:10px">
+                  <span class="main" style="display:grid;gap:6px">
+                    <input name="name_${d.i}" value="${esc(d.name)}" style="box-shadow:none;background:var(--fill);padding:9px 10px;font-size:16px">
+                    ${d.description ? `<input name="desc_${d.i}" value="${esc(d.description)}" style="box-shadow:none;background:var(--fill);padding:7px 10px;font-size:14px;color:var(--muted)">` : ''}
+                  </span>
+                  <input name="price_${d.i}" inputmode="decimal" value="${d.price != null ? String(d.price).replace('.', ',') : ''}" placeholder="€" style="width:78px;flex:none;box-shadow:none;background:var(--fill);padding:9px 8px;font-size:16px;text-align:right">
+                </div>`).join('')}
+            </div>
+          </div>`).join('')}
+        <div class="err" id="err"></div>
+        <button class="btn tap" type="submit">Spremi u jelovnik</button>
+      </form>`,
+  });
+  const f = document.getElementById('f');
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    const { count } = await sb.from('dishes').select('id', { count: 'exact', head: true });
+    const base = (count || 0) * 10;
+    const rows = [];
+    f.querySelectorAll('[data-row]').forEach((el, idx) => {
+      const i = el.dataset.row;
+      if (!f.elements[`on_${i}`].checked) return;
+      const name = f.elements[`name_${i}`].value.trim();
+      if (!name) return;
+      const p = f.elements[`price_${i}`].value.trim().replace(',', '.');
+      rows.push({
+        name, category: f.elements[`cat_${el.dataset.g}`].value.trim() || null,
+        description: f.elements[`desc_${i}`]?.value.trim() || null,
+        price: p && !isNaN(Number(p)) ? Number(p) : null, vat_rate: 13, sort: base + idx,
+      });
+    });
+    if (!rows.length) { document.getElementById('err').textContent = 'Nije odabrano nijedno jelo.'; btn.disabled = false; return; }
+    try {
+      await q(sb.from('dishes').insert(rows));
+      toast(`Spremljeno ${rows.length} ${plural(rows.length, 'jelo', 'jela', 'jela')}`); go('/jelovnik');
+    } catch (err) { document.getElementById('err').textContent = errText(err); btn.disabled = false; }
   };
 }
 
@@ -857,7 +981,7 @@ async function route() {
       if (p[2] === 'edit') return renderCateringForm(p[1]);
       return renderCateringDetail(p[1]);
     case 'restoran': return renderRestoranMenu();
-    case 'jelovnik': return renderMenuList(false);
+    case 'jelovnik': return p[1] === 'skeniraj' ? renderScanMenu() : renderMenuList(false);
     case 'dostava': return renderMenuList(true);
     case 'nabavka': return p[1] ? renderSupplier(p[1]) : renderSuppliers();
     case 'artikli': return renderAllItems();
