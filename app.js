@@ -28,13 +28,29 @@ const num = (n, d = 2) => new Intl.NumberFormat('hr-HR', { maximumFractionDigits
 const fmtStamp = (ts) => { const x = new Date(ts); return `${x.getDate()}.${x.getMonth() + 1}. u ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`; };
 const val = (f, name) => { const v = f.elements[name]?.value?.trim(); return v === '' || v == null ? null : v; };
 const numVal = (f, name) => { const v = val(f, name); return v == null ? null : Number(v.replace(',', '.')); };
+const plural = (n, one, few, many) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
 
+const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICON = {
-  people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
-  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.1 9.9a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>',
+  people: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+  clock: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+  pin: svg('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'),
+  phone: svg('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.1 9.9a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/>'),
+  chev: svg('<path d="m9 18 6-6-6-6"/>'),
+  back: svg('<path d="m15 18-6-6 6-6"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  gear: svg('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
+  calendar: svg('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
+  utensils: svg('<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>'),
+  todo: svg('<path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+  book: svg('<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>'),
+  bike: svg('<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>'),
+  cart: svg('<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>'),
+  users: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+  activity: svg('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
 };
+const LOGO = '<img src="polaris-logo.png" alt="Polaris" class="logo" onerror="this.remove()">';
 
 function toast(msg) {
   const t = document.createElement('div');
@@ -55,17 +71,28 @@ async function q(promise) {
   return data;
 }
 
-function screen({ title, back, action, body }) {
+function screen({ title, back, action, right = '', body, hideTitle }) {
   app.innerHTML = `
     <header class="top">
-      ${back ? `<button class="iconbtn" data-back="${esc(back)}" aria-label="Natrag">‹</button>` : ''}
-      <h1>${esc(title)}</h1>
-      ${action ? `<button class="iconbtn primary" data-go="${esc(action)}" aria-label="Dodaj">+</button>` : ''}
+      ${back ? `<button class="backbtn" data-back="${esc(back)}">${ICON.back}Natrag</button>` : ''}
+      <span class="spacer"></span>
+      ${right}
+      ${action ? `<button class="roundbtn tap" data-go="${esc(action)}" aria-label="Dodaj">${ICON.plus}</button>` : ''}
     </header>
+    ${hideTitle ? '' : `<h1 class="large">${esc(title)}</h1>`}
     <main>${body}</main>`;
+  document.title = title ? `${title} · Polaris` : 'Polaris';
   window.scrollTo(0, 0);
 }
 function loading(title, back) { screen({ title, back, body: '<p class="muted center">Učitavam…</p>' }); }
+function failed(title, back, e) { screen({ title, back, body: `<p class="err">${esc(errText(e))}</p>` }); }
+
+const menuBtn = (path, icon, color, name, sub) => `
+  <button class="tap" data-go="${path}">
+    <span class="ico ${color}">${ICON[icon]}</span>
+    <span class="txt"><span class="name">${esc(name)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span>
+    <span class="chev">${ICON.chev}</span>
+  </button>`;
 
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-back]');
@@ -76,15 +103,15 @@ document.addEventListener('click', (e) => {
 
 /* ---------- prijava ---------- */
 function renderLogin() {
+  document.title = 'Polaris';
   app.innerHTML = `
     <div class="login">
-      <div class="brand">POLARIS</div>
-      <div class="brand-sub">Interna aplikacija</div>
+      <div class="login-hero">${LOGO}<div class="brand-sub">Interna aplikacija</div></div>
       <form id="f" autocomplete="on">
         <label>Korisničko ime<input name="u" autocapitalize="none" autocorrect="off" autocomplete="username" required></label>
         <label>PIN<input name="p" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" required></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Prijava</button>
+        <button class="btn tap" type="submit">Prijava</button>
       </form>
     </div>`;
   const f = document.getElementById('f');
@@ -110,60 +137,87 @@ async function loadMe() {
 async function logout() { await sb.auth.signOut(); me = null; location.hash = '#/'; renderLogin(); }
 
 /* ---------- glavni izbornik ---------- */
-function renderHome() {
+async function renderHome() {
   if (!isAdmin()) return renderTodo();
-  screen({
-    title: 'Polaris',
-    body: `
-      <p class="muted" style="margin-top:0">Bok, ${esc(me.full_name)}</p>
-      <div class="menu">
-        <button data-go="/catering">Catering</button>
-        <button data-go="/nabavka">Nabavka</button>
-        <button data-go="/restoran">Restoran</button>
-        <button data-go="/todo">To-do</button>
-        <button data-go="/korisnici">Korisnici</button>
-      </div>
-      <div class="footer-links">
-        <button class="link" data-go="/pin">Promijeni PIN</button>
-        <button class="link" id="logout">Odjava</button>
-      </div>`,
-  });
-  document.getElementById('logout').onclick = logout;
+  const draw = (cat = '', todo = '') => {
+    screen({
+      title: '', hideTitle: true,
+      right: isSuper() ? `<button class="roundbtn plain tap" data-go="/admin" aria-label="Admin">${ICON.gear}</button>` : '',
+      body: `
+        <div class="home-hero">${LOGO}<div class="hello">Bok, ${esc(me.full_name)}</div></div>
+        <div class="menu">
+          ${menuBtn('/catering', 'calendar', 'green', 'Catering', cat)}
+          ${menuBtn('/restoran', 'utensils', 'gold', 'Restoran', 'Jelovnik, dostava, nabavka')}
+          ${menuBtn('/todo', 'todo', 'green', 'To-do', todo)}
+        </div>
+        <div class="footer-links">
+          <button class="link" data-go="/pin">Promijeni PIN</button>
+          <button class="link" id="logout">Odjava</button>
+        </div>`,
+    });
+    document.getElementById('logout').onclick = logout;
+  };
+  draw();
+  try {
+    const t = todayStr();
+    const [{ count: c }, { count: o }] = await Promise.all([
+      sb.from('caterings').select('id', { count: 'exact', head: true }).gte('event_date', t),
+      sb.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
+    ]);
+    if (location.hash.replace('#', '') in { '': 1, '/': 1 }) {
+      draw(c ? `${c} ${plural(c, 'nadolazeći', 'nadolazeća', 'nadolazećih')}` : 'Nema nadolazećih', o ? `${o} ${plural(o, 'otvoren zadatak', 'otvorena zadatka', 'otvorenih zadataka')}` : 'Sve je gotovo');
+    }
+  } catch { /* brojevi nisu nužni */ }
 }
 
 /* ---------- CATERING ---------- */
-function eventCard(c, past) {
-  const d = parseDate(c.event_date);
+function dayCard(date, events, past) {
+  const d = parseDate(date);
+  const n = events.length;
   return `
-    <button class="card event ${past ? 'past' : ''}" data-go="/catering/${c.id}">
-      <div class="date"><div class="d">${d.getDate()}.</div><div class="m">${MONTHS[d.getMonth()]}</div><div class="w">${DAYS[d.getDay()]}</div></div>
-      <div class="body">
-        ${c.title ? `<div class="title">${esc(c.title)}</div>` : ''}
-        <div class="row">
-          ${c.people ? `<span>${ICON.people}${c.people}</span>` : ''}
-          ${c.event_time ? `<span>${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
-        </div>
-        ${c.location ? `<div class="loc">${ICON.pin}<span>${esc(c.location)}</span></div>` : ''}
+    <div class="day ${n >= 3 ? 'compact' : ''} ${past ? 'past' : ''}">
+      <div class="date">
+        <div class="d">${d.getDate()}.</div><div class="m">${MONTHS[d.getMonth()]}</div><div class="w">${DAYS[d.getDay()]}</div>
+        ${n > 1 ? `<div class="cnt">${n}×</div>` : ''}
       </div>
-    </button>`;
+      <div class="events">${events.map((c, i) => `
+        <button class="ev" data-go="/catering/${c.id}">
+          ${n > 1 ? `<span class="num">${i + 1}</span>` : ''}
+          <span class="body">
+            <span class="title one" style="display:block">${esc(c.title || 'Catering')}</span>
+            <span class="meta">
+              ${c.event_time ? `<span>${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
+              ${c.people ? `<span>${ICON.people}${c.people}</span>` : ''}
+              ${n >= 3 && c.location ? `<span class="one" style="display:block">${esc(c.location)}</span>` : ''}
+            </span>
+            ${n < 3 && c.location ? `<span class="loc">${ICON.pin}<span class="one">${esc(c.location)}</span></span>` : ''}
+          </span>
+          <span class="chev">${ICON.chev}</span>
+        </button>`).join('')}
+      </div>
+    </div>`;
+}
+function groupByDate(rows) {
+  const m = new Map();
+  rows.forEach((r) => { if (!m.has(r.event_date)) m.set(r.event_date, []); m.get(r.event_date).push(r); });
+  return [...m.entries()].sort((x, y) => x[0].localeCompare(y[0]));
 }
 
 async function renderCateringList() {
   loading('Catering', '/');
   try {
-    const rows = await q(sb.from('caterings').select('id, event_date, event_time, people, title, location').order('event_date').order('event_time'));
+    const rows = await q(sb.from('caterings').select('id, event_date, event_time, people, title, location').order('event_date').order('event_time', { nullsFirst: false }));
     const t = todayStr();
-    const upcoming = rows.filter((r) => r.event_date >= t);
-    const past = rows.filter((r) => r.event_date < t).reverse().slice(0, 20);
+    const upcoming = groupByDate(rows.filter((r) => r.event_date >= t));
+    const past = groupByDate(rows.filter((r) => r.event_date < t)).reverse().slice(0, 15);
     let body = '';
     if (!rows.length) body = '<div class="empty">Još nema cateringa.<br>Dodaj prvi na +</div>';
     else {
-      body += '<div class="section-title">Nadolazeći</div>';
-      body += upcoming.length ? `<div class="list">${upcoming.map((c) => eventCard(c)).join('')}</div>` : '<div class="empty">Nema nadolazećih cateringa.</div>';
-      if (past.length) body += `<div class="section-title">Prošli</div><div class="list">${past.map((c) => eventCard(c, true)).join('')}</div>`;
+      body += upcoming.length ? `<div class="list">${upcoming.map(([d, ev]) => dayCard(d, ev)).join('')}</div>` : '<div class="empty">Nema nadolazećih cateringa.</div>';
+      if (past.length) body += `<div class="section-title">Prošli</div><div class="list">${past.map(([d, ev]) => dayCard(d, ev, true)).join('')}</div>`;
     }
     screen({ title: 'Catering', back: '/', action: '/catering/new', body });
-  } catch (e) { screen({ title: 'Catering', back: '/', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Catering', '/', e); }
 }
 
 async function renderCateringDetail(id) {
@@ -172,26 +226,27 @@ async function renderCateringDetail(id) {
     const c = await q(sb.from('caterings').select('*').eq('id', id).single());
     const d = parseDate(c.event_date);
     const item = (label, v) => (v ? `<div class="item"><div class="label">${label}</div><div class="value">${esc(v)}</div></div>` : '');
+    const hasDetails = c.location || c.contact || c.description || c.platters || c.extras;
     screen({
       title: c.title || 'Catering', back: '/catering',
       body: `
-        <div class="detail">
-          <div class="item">
-            <div class="bigdate">${d.getDate()}. ${MONTHS[d.getMonth()]}</div>
-            <div class="muted">${DAYS_FULL[d.getDay()]}, ${fmtDateShort(c.event_date)}</div>
-            <div class="card static" style="border:0;padding:0;margin-top:8px"><div class="row" style="font-size:17px;color:var(--ink)">
-              ${c.people ? `<span>${ICON.people}${c.people} osoba</span>` : ''}
-              ${c.event_time ? `<span>${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
-            </div></div>
+        <div class="hero">
+          <div class="bigdate">${d.getDate()}. ${MONTHS[d.getMonth()]}</div>
+          <div class="muted">${DAYS_FULL[d.getDay()]}, ${fmtDateShort(c.event_date)}</div>
+          <div class="chips">
+            ${c.event_time ? `<span class="chip">${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
+            ${c.people ? `<span class="chip">${ICON.people}${c.people} ${plural(c.people, 'osoba', 'osobe', 'osoba')}</span>` : ''}
           </div>
+        </div>
+        ${hasDetails ? `<div class="detail">
           ${item('Lokacija', c.location)}
           ${item('Kontakt', c.contact)}
+          ${item('Opis i napomene', c.description)}
           ${item('Banjice', c.platters)}
           ${item('Dodatno', c.extras)}
-          ${item('Opis i napomene', c.description)}
-        </div>
+        </div>` : ''}
         <div class="actions">
-          <button class="btn secondary" data-go="/catering/${c.id}/edit">Uredi</button>
+          <button class="btn secondary tap" data-go="/catering/${c.id}/edit">Uredi</button>
           <button class="btn danger" id="del">Obriši catering</button>
         </div>`,
     });
@@ -199,18 +254,20 @@ async function renderCateringDetail(id) {
       if (!confirm('Obrisati ovaj catering?')) return;
       try { await q(sb.from('caterings').delete().eq('id', id)); toast('Obrisano'); go('/catering'); } catch (e) { toast(errText(e)); }
     };
-  } catch (e) { screen({ title: 'Catering', back: '/catering', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Catering', '/catering', e); }
 }
 
 async function renderCateringForm(id) {
   let c = { event_date: todayStr() };
   if (id) { loading('Uredi catering', `/catering/${id}`); try { c = await q(sb.from('caterings').select('*').eq('id', id).single()); } catch (e) { toast(errText(e)); } }
+  // stari zapisi: banjice i dodatno spajamo u opis
+  const desc = [c.description, c.platters && `Banjice: ${c.platters}`, c.extras && `Dodatno: ${c.extras}`].filter(Boolean).join('\n');
   const back = id ? `/catering/${id}` : '/catering';
   screen({
     title: id ? 'Uredi catering' : 'Novi catering', back,
     body: `
       <form id="f">
-        <label>Naziv / klijent<input name="title" value="${esc(c.title)}" placeholder="npr. Rođendan Horvat, Bowling"></label>
+        <label>Naziv<input name="title" value="${esc(c.title)}" placeholder="npr. Rođendan Horvat, Bowling"></label>
         <div class="grid2">
           <label>Datum<input name="event_date" type="date" value="${esc(c.event_date)}" required></label>
           <label>Vrijeme<input name="event_time" type="time" value="${esc(c.event_time?.slice(0, 5))}"></label>
@@ -218,11 +275,9 @@ async function renderCateringForm(id) {
         <label>Broj ljudi<input name="people" type="number" inputmode="numeric" min="0" value="${esc(c.people)}"></label>
         <label>Lokacija<input name="location" value="${esc(c.location)}" placeholder="npr. Sala Luma, J.J. Strossmayera 271"></label>
         <label>Kontakt<input name="contact" value="${esc(c.contact)}" placeholder="ime i broj mobitela"></label>
-        <label>Banjice<textarea name="platters" placeholder="npr. 2x svinjski vrat + riža, 1x ćevapi, 1x pohano">${esc(c.platters)}</textarea></label>
-        <label>Dodatno<textarea name="extras" placeholder="npr. 20 pizza, lepinje, salata, pribor">${esc(c.extras)}</textarea></label>
-        <label>Opis i napomene<textarea name="description" style="min-height:130px">${esc(c.description)}</textarea></label>
+        <label>Opis i napomene<textarea name="description" style="min-height:200px" placeholder="hrana, banjice, pizze, napomene…">${esc(desc)}</textarea></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Spremi</button>
+        <button class="btn tap" type="submit">Spremi</button>
       </form>`,
   });
   const f = document.getElementById('f');
@@ -232,7 +287,7 @@ async function renderCateringForm(id) {
     const row = {
       title: val(f, 'title'), event_date: val(f, 'event_date'), event_time: val(f, 'event_time'),
       people: numVal(f, 'people'), location: val(f, 'location'), contact: val(f, 'contact'),
-      platters: val(f, 'platters'), extras: val(f, 'extras'), description: val(f, 'description'),
+      description: val(f, 'description'), platters: null, extras: null,
     };
     try {
       if (id) { await q(sb.from('caterings').update(row).eq('id', id)); go(`/catering/${id}`); }
@@ -242,30 +297,48 @@ async function renderCateringForm(id) {
   };
 }
 
+/* ---------- RESTORAN ---------- */
+function renderRestoranMenu() {
+  screen({
+    title: 'Restoran', back: '/',
+    body: `<div class="menu">
+      ${menuBtn('/jelovnik', 'book', 'green', 'Jelovnik', 'Normativi, recepti, food cost')}
+      ${menuBtn('/dostava', 'bike', 'gold', 'Jelovnik - Dostava', 'Cijene za Wolt i sl.')}
+      ${menuBtn('/nabavka', 'cart', 'green', 'Nabavka', 'Dobavljači, artikli, cijene')}
+    </div>`,
+  });
+}
+
 /* ---------- NABAVKA ---------- */
 async function renderSuppliers() {
-  loading('Nabavka', '/');
+  loading('Nabavka', '/restoran');
   try {
     const rows = await q(sb.from('suppliers').select('id, name, items(count)').order('name'));
     screen({
-      title: 'Nabavka', back: '/', action: '/dobavljac/new',
+      title: 'Nabavka', back: '/restoran', action: '/dobavljac/new',
       body: `
         <div class="section-title">Dobavljači</div>
-        ${rows.length ? `<div class="list">${rows.map((s) => `
-          <button class="card" data-go="/nabavka/${s.id}">
-            <div class="price-row"><span class="title">${esc(s.name)}</span><span class="muted">${s.items[0]?.count || 0} artikala</span></div>
-          </button>`).join('')}</div>` : '<div class="empty">Nema dobavljača. Dodaj na +</div>'}
-        <div class="actions"><button class="btn secondary" data-go="/artikli">Svi artikli i cijene</button></div>`,
+        ${rows.length ? `<div class="group">${rows.map((s) => {
+          const n = s.items[0]?.count || 0;
+          return `<button class="cell" data-go="/nabavka/${s.id}">
+            <span class="main"><span class="title one" style="display:block">${esc(s.name)}</span></span>
+            <span class="muted nowrap">${n} ${plural(n, 'artikl', 'artikla', 'artikala')}</span>
+            <span class="chev">${ICON.chev}</span>
+          </button>`;
+        }).join('')}</div>` : '<div class="empty">Nema dobavljača. Dodaj na +</div>'}
+        <div class="actions"><button class="btn secondary tap" data-go="/artikli">Svi artikli i cijene</button></div>`,
     });
-  } catch (e) { screen({ title: 'Nabavka', back: '/', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Nabavka', '/restoran', e); }
 }
 
-function itemCard(i, showSupplier) {
+function itemCell(i, showSupplier) {
   const gross = i.price_net != null ? i.price_net * (1 + (i.vat_rate || 0) / 100) : null;
   return `
-    <button class="card" data-go="/artikl/${i.id}">
-      <div class="price-row"><span class="title">${esc(i.name)}</span><span class="p">${eur(i.price_net)} / ${esc(i.unit)}</span></div>
-      <div class="row small"><span>${showSupplier ? esc(i.suppliers?.name) + ' · ' : ''}s PDV-om ${eur(gross)} (${num(i.vat_rate ?? 0, 1)}%)</span><span>ažurirano ${fmtStamp(i.updated_at)}</span></div>
+    <button class="cell" data-go="/artikl/${i.id}">
+      <span class="main">
+        <span class="price-row"><span class="title one">${esc(i.name)}</span><span class="p">${eur(i.price_net)}<span class="muted" style="font-weight:400">/${esc(i.unit)}</span></span></span>
+        <span class="meta price-row"><span class="one">${showSupplier ? esc(i.suppliers?.name) + ' · ' : ''}s PDV-om ${eur(gross)}</span><span class="nowrap">${fmtStamp(i.updated_at)}</span></span>
+      </span>
     </button>`;
 }
 
@@ -277,35 +350,30 @@ async function renderSupplier(id) {
     screen({
       title: s.name, back: '/nabavka', action: `/artikl/new?s=${s.id}`,
       body: `
-        ${s.contact || s.note ? `<div class="detail" style="margin-bottom:14px">
+        ${s.contact || s.note ? `<div class="detail" style="margin-bottom:6px">
           ${s.contact ? `<div class="item"><div class="label">Kontakt</div><div class="value">${esc(s.contact)}</div></div>` : ''}
           ${s.note ? `<div class="item"><div class="label">Napomena</div><div class="value">${esc(s.note)}</div></div>` : ''}
         </div>` : ''}
         <div class="section-title">Artikli · cijene bez PDV-a</div>
-        ${items.length ? `<div class="list">${items.map((i) => itemCard(i)).join('')}</div>` : '<div class="empty">Nema artikala. Dodaj na +</div>'}
-        <div class="actions"><button class="btn secondary" data-go="/dobavljac/${s.id}/edit">Uredi dobavljača</button></div>`,
+        ${items.length ? `<div class="group">${items.map((i) => itemCell(i)).join('')}</div>` : '<div class="empty">Nema artikala. Dodaj na +</div>'}
+        <div class="actions"><button class="btn secondary tap" data-go="/dobavljac/${s.id}/edit">Uredi dobavljača</button></div>`,
     });
-  } catch (e) { screen({ title: 'Dobavljač', back: '/nabavka', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Dobavljač', '/nabavka', e); }
 }
 
 async function renderAllItems() {
   loading('Svi artikli', '/nabavka');
   try {
     const rows = await q(sb.from('items').select('*, suppliers(name)').order('name'));
-    screen({
-      title: 'Svi artikli', back: '/nabavka',
-      body: `
-        <input id="s" placeholder="Traži artikl…" style="margin-bottom:12px">
-        <div class="list" id="l"></div>`,
-    });
+    screen({ title: 'Svi artikli', back: '/nabavka', body: '<input id="s" type="search" placeholder="Traži artikl…" style="margin-bottom:14px"><div id="l"></div>' });
     const l = document.getElementById('l');
     const draw = (t) => {
       const f = rows.filter((r) => r.name.toLowerCase().includes(t.toLowerCase()));
-      l.innerHTML = f.length ? f.map((i) => itemCard(i, true)).join('') : '<div class="empty">Nema artikala.</div>';
+      l.innerHTML = f.length ? `<div class="group">${f.map((i) => itemCell(i, true)).join('')}</div>` : '<div class="empty">Nema artikala.</div>';
     };
     document.getElementById('s').oninput = (e) => draw(e.target.value);
     draw('');
-  } catch (e) { screen({ title: 'Svi artikli', back: '/nabavka', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Svi artikli', '/nabavka', e); }
 }
 
 async function renderSupplierForm(id) {
@@ -320,7 +388,7 @@ async function renderSupplierForm(id) {
         <label>Kontakt<input name="contact" value="${esc(s.contact)}" placeholder="osoba, mobitel, e-mail"></label>
         <label>Napomena<textarea name="note">${esc(s.note)}</textarea></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Spremi</button>
+        <button class="btn tap" type="submit">Spremi</button>
         ${id && isSuper() ? '<button class="btn danger" type="button" id="del">Obriši dobavljača i njegove artikle</button>' : ''}
       </form>`,
   });
@@ -362,10 +430,10 @@ async function renderItemForm(id, supplierId) {
           <label>Cijena bez PDV-a (€)<input name="price_net" inputmode="decimal" value="${esc(i.price_net)}" placeholder="0,00"></label>
           <label>Po jedinici<select name="unit">${unitOptions(i.unit)}</select></label>
         </div>
-        <label>PDV %<select name="vat_rate">${[25, 13, 5, 0].map((v) => `<option value="${v}" ${Number(i.vat_rate) === v ? 'selected' : ''}>${v}%</option>`).join('')}</select></label>
-        ${id ? `<p class="muted small" style="margin:0">Zadnja promjena: ${fmtStamp(i.updated_at)}</p>` : ''}
+        <label>PDV<select name="vat_rate">${[25, 13, 5, 0].map((v) => `<option value="${v}" ${Number(i.vat_rate) === v ? 'selected' : ''}>${v}%</option>`).join('')}</select></label>
+        ${id ? `<p class="muted small" style="margin:0 4px">Zadnja promjena: ${fmtStamp(i.updated_at)}</p>` : ''}
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Spremi</button>
+        <button class="btn tap" type="submit">Spremi</button>
         ${id ? '<button class="btn danger" type="button" id="del">Obriši artikl</button>' : ''}
       </form>`,
   });
@@ -387,7 +455,7 @@ async function renderItemForm(id, supplierId) {
   };
 }
 
-/* ---------- RESTORAN: jelovnik, normativ, recept ---------- */
+/* ---------- JELOVNIK: normativ, recept, food cost ---------- */
 const BASE = { kg: ['kg', 1], g: ['kg', 0.001], l: ['l', 1], ml: ['l', 0.001], kom: ['kom', 1], pak: ['pak', 1] };
 function lineCost(ing) {
   const it = ing.items;
@@ -410,70 +478,61 @@ function factorBadge(priceGross, vat, cost) {
   return `<span class="badge ${f >= 3 ? 'good' : 'bad'}">${num(f, 2)}x</span>`;
 }
 
-let restoranTab = 'jelovnik';
-async function renderRestoran() {
-  loading('Restoran', '/');
+async function renderMenuList(delivery) {
+  const title = delivery ? 'Dostava' : 'Jelovnik';
+  loading(title, '/restoran');
   try {
     const rows = await q(sb.from('dishes').select('*, dish_ingredients(qty, unit, items(price_net, unit))').order('category', { nullsFirst: false }).order('name'));
-    const delivery = restoranTab === 'dostava';
     const list = delivery ? rows.filter((d) => d.on_delivery) : rows;
     const groups = {};
     list.forEach((d) => { (groups[d.category || 'Ostalo'] ||= []).push(d); });
     const body = `
-      <div class="tabs">
-        <button data-tab="jelovnik" class="${!delivery ? 'on' : ''}">Jelovnik</button>
-        <button data-tab="dostava" class="${delivery ? 'on' : ''}">Jelovnik - Dostava</button>
-      </div>
       ${list.length ? Object.entries(groups).map(([cat, ds]) => `
         <div class="section-title">${esc(cat)}</div>
-        <div class="list">${ds.map((d) => {
+        <div class="group">${ds.map((d) => {
           const { cost, missing } = dishCost(d);
           const price = delivery ? d.delivery_price : d.price;
           return `
-          <button class="card" data-go="/jelo/${d.id}">
-            <div class="price-row"><span class="title">${esc(d.name)}</span><span class="p">${eur(price)}</span></div>
-            <div class="row small">
-              <span>Food cost ${cost != null ? eur(cost) : '—'}${missing ? ` (${missing} bez cijene)` : ''}</span>
-              ${factorBadge(price, d.vat_rate, cost)}
-            </div>
+          <button class="cell" data-go="/jelo/${d.id}">
+            <span class="main">
+              <span class="price-row"><span class="title one">${esc(d.name)}</span><span class="p">${eur(price)}</span></span>
+              <span class="meta price-row"><span class="one">Food cost ${cost != null ? eur(cost) : '—'}${missing ? ` · ${missing} bez cijene` : ''}</span>${factorBadge(price, d.vat_rate, cost)}</span>
+            </span>
           </button>`;
-        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije označeno za dostavu.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan. Dodaj jelo na +'}</div>`}
-      <p class="muted small">Faktor = prodajna cijena bez PDV-a / nabavna cijena sastojaka. Cilj je iznad 3x.</p>`;
-    screen({ title: 'Restoran', back: '/', action: '/jelo/new', body });
-    app.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { restoranTab = b.dataset.tab; renderRestoran(); }));
-  } catch (e) { screen({ title: 'Restoran', back: '/', body: `<p class="err">${esc(errText(e))}</p>` }); }
+        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan. Dodaj jelo na +'}</div>`}
+      <p class="muted small" style="margin:16px 4px">Faktor = prodajna cijena bez PDV-a / nabavna cijena sastojaka. Cilj je iznad 3x.</p>`;
+    screen({ title: delivery ? 'Jelovnik - Dostava' : 'Jelovnik', back: '/restoran', action: '/jelo/new', body });
+  } catch (e) { failed(title, '/restoran', e); }
 }
 
 async function renderDish(id) {
-  loading('Jelo', '/restoran');
+  loading('Jelo', '/jelovnik');
   try {
     const d = await q(sb.from('dishes').select('*, dish_ingredients(*, items(name, price_net, unit, suppliers(name)))').eq('id', id).single());
     const ings = (d.dish_ingredients || []).sort((a, b) => a.sort - b.sort);
     const { cost, missing } = dishCost(d);
-    const priceLine = (label, p) => `<div class="price-row"><span>${label}</span><span class="p">${eur(p)} ${factorBadge(p, d.vat_rate, cost)}</span></div>`;
+    const priceLine = (label, p) => `<div class="price-row" style="margin-top:6px"><span>${label}</span><span class="p">${eur(p)} ${factorBadge(p, d.vat_rate, cost)}</span></div>`;
     screen({
-      title: d.name, back: '/restoran',
+      title: d.name, back: '/jelovnik',
       body: `
-        <div class="detail">
-          <div class="item">
-            ${priceLine('Cijena u restoranu', d.price)}
-            ${d.on_delivery ? priceLine('Cijena na dostavi', d.delivery_price) : ''}
-            <div class="muted small" style="margin-top:6px">${esc(d.category || '')} · PDV ${num(d.vat_rate ?? 0, 1)}%</div>
-          </div>
-          <div class="item">
-            <div class="label">Normativ (1 porcija)</div>
-            ${ings.length ? ings.map((g) => {
-              const c = lineCost(g);
-              return `<div class="price-row" style="margin-top:6px"><span>${esc(g.name)} · ${num(g.qty, 3)} ${esc(g.unit)}</span><span class="${c == null ? 'muted' : ''}">${c == null ? 'nema cijene' : eur(c)}</span></div>`;
-            }).join('') : '<div class="value muted">Normativ nije upisan.</div>'}
-            ${ings.length ? `<div class="price-row" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px"><strong>Food cost</strong><strong>${eur(cost)}</strong></div>` : ''}
-            ${missing ? `<div class="muted small">${missing} sastojaka nije povezano s artiklom iz Nabavke ili mu nedostaje cijena.</div>` : ''}
-          </div>
-          <div class="item"><div class="label">Recept</div><div class="value">${d.recipe ? esc(d.recipe) : '<span class="muted">Recept nije upisan.</span>'}</div></div>
+        <div class="hero">
+          <div class="muted small">${esc(d.category || 'Bez kategorije')} · PDV ${num(d.vat_rate ?? 0, 1)}%</div>
+          ${priceLine('Restoran', d.price)}
+          ${d.on_delivery ? priceLine('Dostava', d.delivery_price) : ''}
         </div>
-        <div class="actions"><button class="btn secondary" data-go="/jelo/${d.id}/edit">Uredi jelo, normativ i recept</button></div>`,
+        <div class="section-title">Normativ za 1 porciju</div>
+        <div class="group">
+          ${ings.length ? ings.map((g) => {
+            const c = lineCost(g);
+            return `<div class="cell static"><span class="main price-row"><span class="one">${esc(g.name)} <span class="muted">· ${num(g.qty, 3)} ${esc(g.unit)}</span></span><span class="nowrap ${c == null ? 'muted' : ''}">${c == null ? 'nema cijene' : eur(c)}</span></span></div>`;
+          }).join('') + `<div class="cell static"><span class="main price-row"><strong>Food cost</strong><strong>${eur(cost)}</strong></span></div>` : '<div class="cell static muted">Normativ nije upisan.</div>'}
+        </div>
+        ${missing ? `<p class="muted small" style="margin:8px 4px 0">${missing} ${plural(missing, 'sastojak nije povezan', 'sastojka nisu povezana', 'sastojaka nije povezano')} s artiklom iz Nabavke ili nema cijenu.</p>` : ''}
+        <div class="section-title">Recept</div>
+        <div class="detail"><div class="item"><div class="value">${d.recipe ? esc(d.recipe) : '<span class="muted">Recept nije upisan.</span>'}</div></div></div>
+        <div class="actions"><button class="btn secondary tap" data-go="/jelo/${d.id}/edit">Uredi jelo, normativ i recept</button></div>`,
     });
-  } catch (e) { screen({ title: 'Jelo', back: '/restoran', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Jelo', '/jelovnik', e); }
 }
 
 async function renderDishForm(id) {
@@ -487,12 +546,12 @@ async function renderDishForm(id) {
   const byLabel = new Map(items.map((i) => [label(i), i]));
   const byId = new Map(items.map((i) => [i.id, i]));
   const ings = (d.dish_ingredients || []).sort((a, b) => a.sort - b.sort);
-  const back = id ? `/jelo/${id}` : '/restoran';
+  const back = id ? `/jelo/${id}` : '/jelovnik';
   const ingRow = (g = {}) => {
     const it = g.item_id && byId.get(g.item_id);
     return `<div class="ing">
       <input name="ing_name" list="itemlist" value="${esc(it ? label(it) : g.name)}" placeholder="Sastojak">
-      <input name="ing_qty" inputmode="decimal" value="${esc(g.qty != null ? String(g.qty).replace('.', ',') : '')}" placeholder="Količina">
+      <input name="ing_qty" inputmode="decimal" value="${esc(g.qty != null ? String(g.qty).replace('.', ',') : '')}" placeholder="Kol.">
       <select name="ing_unit">${unitOptions(g.unit || 'g')}</select>
       <button type="button" class="x" aria-label="Makni">×</button>
     </div>`;
@@ -504,21 +563,21 @@ async function renderDishForm(id) {
         <label>Naziv jela<input name="name" value="${esc(d.name)}" required></label>
         <label>Kategorija<input name="category" value="${esc(d.category)}" placeholder="npr. Roštilj, Pizze, Salate"></label>
         <div class="grid2">
-          <label>Cijena (€, s PDV-om)<input name="price" inputmode="decimal" value="${esc(d.price)}"></label>
-          <label>PDV %<select name="vat_rate">${[13, 25, 5, 0].map((v) => `<option value="${v}" ${Number(d.vat_rate) === v ? 'selected' : ''}>${v}%</option>`).join('')}</select></label>
+          <label>Cijena s PDV-om (€)<input name="price" inputmode="decimal" value="${esc(d.price)}"></label>
+          <label>PDV<select name="vat_rate">${[13, 25, 5, 0].map((v) => `<option value="${v}" ${Number(d.vat_rate) === v ? 'selected' : ''}>${v}%</option>`).join('')}</select></label>
         </div>
-        <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:16px;color:var(--ink)"><input type="checkbox" name="on_delivery" style="width:22px;height:22px" ${d.on_delivery ? 'checked' : ''}> Na dostavi (Wolt i sl.)</label>
-        <label id="dp" ${d.on_delivery ? '' : 'hidden'}>Cijena na dostavi (€, s PDV-om)<input name="delivery_price" inputmode="decimal" value="${esc(d.delivery_price)}"></label>
+        <label class="switch-row"><input type="checkbox" name="on_delivery" ${d.on_delivery ? 'checked' : ''}> Na dostavi (Wolt i sl.)</label>
+        <label id="dp" ${d.on_delivery ? '' : 'hidden'}>Cijena na dostavi s PDV-om (€)<input name="delivery_price" inputmode="decimal" value="${esc(d.delivery_price)}"></label>
         <div>
-          <div class="section-title" style="margin-top:6px">Normativ za 1 porciju</div>
-          <p class="muted small" style="margin-top:0">Odaberi artikl iz Nabavke da se izračuna cijena.</p>
+          <div class="section-title" style="margin-top:8px">Normativ za 1 porciju</div>
+          <p class="muted small" style="margin:0 4px 10px">Odaberi artikl iz Nabavke da se izračuna cijena.</p>
           <datalist id="itemlist">${items.map((i) => `<option value="${esc(label(i))}">`).join('')}</datalist>
           <div id="ings" style="display:grid;gap:8px">${ings.map(ingRow).join('')}</div>
-          <button type="button" class="btn secondary" id="add" style="margin-top:8px">+ Dodaj sastojak</button>
+          <button type="button" class="btn secondary tap" id="add" style="margin-top:10px">+ Dodaj sastojak</button>
         </div>
         <label>Recept (priprema)<textarea name="recipe" style="min-height:180px">${esc(d.recipe)}</textarea></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Spremi</button>
+        <button class="btn tap" type="submit">Spremi</button>
         ${id ? '<button class="btn danger" type="button" id="del">Obriši jelo</button>' : ''}
       </form>`,
   });
@@ -531,8 +590,8 @@ async function renderDishForm(id) {
     if (e.target.name !== 'ing_name') return;
     const it = byLabel.get(e.target.value);
     const unitSel = e.target.closest('.ing').querySelector('[name=ing_unit]');
-    if (it && it.unit === 'kg' && unitSel.value !== 'kg') unitSel.value = 'g';
-    else if (it && it.unit === 'l' && unitSel.value !== 'l') unitSel.value = 'ml';
+    if (it && it.unit === 'kg') unitSel.value = 'g';
+    else if (it && it.unit === 'l') unitSel.value = 'ml';
     else if (it) unitSel.value = it.unit;
   };
   f.on_delivery.onchange = () => { document.getElementById('dp').hidden = !f.on_delivery.checked; };
@@ -567,7 +626,7 @@ async function renderDishForm(id) {
   const del = document.getElementById('del');
   if (del) del.onclick = async () => {
     if (!confirm('Obrisati jelo?')) return;
-    try { await q(sb.from('dishes').delete().eq('id', id)); toast('Obrisano'); go('/restoran'); } catch (e2) { toast(errText(e2)); }
+    try { await q(sb.from('dishes').delete().eq('id', id)); toast('Obrisano'); go('/jelovnik'); } catch (e2) { toast(errText(e2)); }
   };
 }
 
@@ -590,26 +649,27 @@ async function renderTodo() {
     const done = rows.filter((t) => t.done).sort((a, b) => b.done_at.localeCompare(a.done_at)).slice(0, 30);
     const t0 = todayStr();
     const card = (t) => `
-      <div class="card static task ${t.done ? 'done' : ''}">
-        <button class="check ${t.done ? 'on' : ''}" data-done="${t.id}" data-v="${t.done ? 0 : 1}" aria-label="Gotovo">${t.done ? '✓' : ''}</button>
+      <div class="task ${t.done ? 'done' : ''}">
+        <button class="check ${t.done ? 'on' : ''}" data-done="${t.id}" data-v="${t.done ? 0 : 1}" aria-label="Gotovo">${t.done ? ICON.check : ''}</button>
         <div style="flex:1;min-width:0">
           <div class="title">${esc(t.title)}</div>
           ${t.description ? `<div class="small muted" style="white-space:pre-wrap;margin-top:2px">${esc(t.description)}</div>` : ''}
-          <div class="row small">
+          ${(admin || t.due_date) ? `<div class="meta">
             ${admin ? `<span>${esc(t.assignee?.full_name || '')}</span>` : ''}
-            ${t.due_date ? `<span class="${!t.done && t.due_date < t0 ? 'overdue' : ''}">rok ${fmtDateShort(t.due_date)}</span>` : ''}
-          </div>
-          ${t.done ? `<div class="donemsg">${admin ? esc(t.assignee?.full_name || '') + ' označio kao gotovo' : 'Označeno kao gotovo'} · ${fmtStamp(t.done_at)}</div>` : ''}
-          ${isSuper() ? `<button class="link small" data-del="${t.id}">Obriši</button>` : ''}
+            ${t.due_date ? `<span class="nowrap ${!t.done && t.due_date < t0 ? 'overdue' : ''}">${fmtDateShort(t.due_date)}</span>` : ''}
+          </div>` : ''}
+          ${t.done ? `<div class="donemsg">${admin ? esc(t.assignee?.full_name || '') + ' označio kao gotovo' : 'Označeno kao gotovo'}</div><div class="small muted">${fmtStamp(t.done_at)}</div>` : ''}
+          ${isSuper() ? `<button class="del" data-del="${t.id}">Obriši</button>` : ''}
         </div>
       </div>`;
+    const groupOf = (arr) => `<div class="group">${arr.map(card).join('<div class="sep"></div>')}</div>`;
     screen({
       title, back, action: admin ? '/todo/new' : null,
       body: `
-        ${admin ? `<select id="pf" style="margin-bottom:14px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : `<p class="muted" style="margin-top:0">Bok, ${esc(me.full_name)}</p>`}
+        ${admin ? `<select id="pf" style="margin-bottom:6px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : `<p class="muted" style="margin:-6px 4px 6px">Bok, ${esc(me.full_name)}</p>`}
         <div class="section-title">Za napraviti</div>
-        ${open.length ? `<div class="list">${open.map(card).join('')}</div>` : '<div class="empty">Nema otvorenih zadataka.</div>'}
-        ${done.length ? `<div class="section-title">Gotovo</div><div class="list">${done.map(card).join('')}</div>` : ''}
+        ${open.length ? groupOf(open) : '<div class="empty">Nema otvorenih zadataka.</div>'}
+        ${done.length ? `<div class="section-title">Gotovo</div>${groupOf(done)}` : ''}
         ${admin ? '' : `<div class="footer-links"><button class="link" data-go="/pin">Promijeni PIN</button><button class="link" id="logout">Odjava</button></div>`}`,
     });
     const lo = document.getElementById('logout'); if (lo) lo.onclick = logout;
@@ -622,7 +682,7 @@ async function renderTodo() {
       if (!confirm('Obrisati zadatak?')) return;
       try { await q(sb.from('tasks').delete().eq('id', b.dataset.del)); renderTodo(); } catch (e) { toast(errText(e)); }
     }));
-  } catch (e) { screen({ title, back, body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed(title, back, e); }
 }
 
 async function renderTaskForm() {
@@ -635,9 +695,9 @@ async function renderTaskForm() {
         <label>Zadatak<input name="title" required placeholder="npr. Nabavka u Metru"></label>
         <label>Opis<textarea name="description" placeholder="detalji, popis stvari…"></textarea></label>
         <label>Za koga<select name="assigned_to" required>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select></label>
-        <label>Rok<input name="due_date" type="date" value="${todayStr()}"></label>
+        <label>Datum<input name="due_date" type="date" value="${todayStr()}"></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Zadaj</button>
+        <button class="btn tap" type="submit">Zadaj</button>
       </form>`,
   });
   const f = document.getElementById('f');
@@ -650,21 +710,56 @@ async function renderTaskForm() {
   };
 }
 
-/* ---------- KORISNICI ---------- */
+/* ---------- ADMIN (samo super admin) ---------- */
+function renderAdmin() {
+  screen({
+    title: 'Admin', back: '/',
+    body: `<div class="menu">
+      ${menuBtn('/korisnici', 'users', 'green', 'Korisnici', 'Računi, uloge, PIN-ovi')}
+      ${menuBtn('/radnje', 'activity', 'gold', 'Radnje', 'Što se zadnje mijenjalo')}
+    </div>`,
+  });
+}
+
+async function renderActivity() {
+  loading('Radnje', '/admin');
+  try {
+    const [tasks, cats, items] = await Promise.all([
+      q(sb.from('tasks').select('title, done, done_at, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), creator:profiles!tasks_created_by_fkey(full_name)').order('created_at', { ascending: false }).limit(40)),
+      q(sb.from('caterings').select('title, event_date, created_at, creator:profiles(full_name)').order('created_at', { ascending: false }).limit(20)),
+      q(sb.from('items').select('name, price_net, unit, updated_at, suppliers(name)').order('updated_at', { ascending: false }).limit(20)),
+    ]);
+    const ev = [];
+    tasks.forEach((t) => {
+      ev.push({ at: t.created_at, txt: `${t.creator?.full_name || 'Admin'} zadao: ${t.title} → ${t.assignee?.full_name || ''}` });
+      if (t.done && t.done_at) ev.push({ at: t.done_at, txt: `${t.assignee?.full_name || ''} označio gotovo: ${t.title}`, good: true });
+    });
+    cats.forEach((c) => ev.push({ at: c.created_at, txt: `${c.creator?.full_name || 'Admin'} dodao catering: ${c.title || 'Catering'} (${fmtDateShort(c.event_date)})` }));
+    items.forEach((i) => ev.push({ at: i.updated_at, txt: `Cijena: ${i.name} ${eur(i.price_net)}/${i.unit} (${i.suppliers?.name || ''})` }));
+    ev.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    screen({
+      title: 'Radnje', back: '/admin',
+      body: ev.length ? `<div class="group">${ev.slice(0, 50).map((e) => `
+        <div class="cell static"><span class="main"><span style="display:block;${e.good ? 'color:var(--done);font-weight:600' : ''}">${esc(e.txt)}</span><span class="meta">${fmtStamp(e.at)}</span></span></div>`).join('')}</div>` : '<div class="empty">Još nema radnji.</div>',
+    });
+  } catch (e) { failed('Radnje', '/admin', e); }
+}
+
 const ROLE = { super_admin: 'Super admin', admin: 'Admin', user: 'Zaposlenik' };
 async function renderUsers() {
-  loading('Korisnici', '/');
+  loading('Korisnici', '/admin');
   try {
     const rows = await q(sb.from('profiles').select('*').order('full_name'));
     screen({
-      title: 'Korisnici', back: '/', action: '/korisnici/new',
-      body: `<div class="list">${rows.map((u) => `
-        <button class="card" data-go="/korisnici/${u.id}" style="${u.active ? '' : 'opacity:.5'}">
-          <div class="price-row"><span class="title">${esc(u.full_name)}</span><span class="muted">${ROLE[u.role]}</span></div>
-          <div class="row small"><span>@${esc(u.username)}</span>${u.active ? '' : '<span>neaktivan</span>'}</div>
+      title: 'Korisnici', back: '/admin', action: '/korisnici/new',
+      body: `<div class="group">${rows.map((u) => `
+        <button class="cell" data-go="/korisnici/${u.id}" style="${u.active ? '' : 'opacity:.5'}">
+          <span class="main"><span class="title one" style="display:block">${esc(u.full_name)}</span><span class="meta">@${esc(u.username)}${u.active ? '' : ' · neaktivan'}</span></span>
+          <span class="muted nowrap">${ROLE[u.role]}</span>
+          <span class="chev">${ICON.chev}</span>
         </button>`).join('')}</div>`,
     });
-  } catch (e) { screen({ title: 'Korisnici', back: '/', body: `<p class="err">${esc(errText(e))}</p>` }); }
+  } catch (e) { failed('Korisnici', '/admin', e); }
 }
 
 function renderUserNew() {
@@ -675,9 +770,9 @@ function renderUserNew() {
         <label>Ime i prezime<input name="full_name" required placeholder="npr. Antonio"></label>
         <label>Korisničko ime<input name="username" required autocapitalize="none" autocorrect="off" placeholder="npr. antonio"></label>
         <label>PIN (4 do 8 brojeva)<input name="pin" class="pin" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" required></label>
-        <label>Uloga<select name="role"><option value="user">Zaposlenik (vidi samo svoje zadatke)</option><option value="admin">Admin (vidi sve)</option></select></label>
+        <label>Uloga<select name="role"><option value="user">Zaposlenik (vidi samo svoje zadatke)</option><option value="admin">Admin (vidi sve osim Admin dijela)</option></select></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Napravi račun</button>
+        <button class="btn tap" type="submit">Napravi račun</button>
       </form>`,
   });
   const f = document.getElementById('f');
@@ -693,28 +788,25 @@ function renderUserNew() {
 async function renderUserEdit(id) {
   let u;
   try { u = await q(sb.from('profiles').select('*').eq('id', id).single()); } catch (e) { toast(errText(e)); return go('/korisnici'); }
-  const canEdit = u.role !== 'super_admin' || isSuper();
   screen({
     title: u.full_name, back: '/korisnici',
     body: `
-      <div class="detail" style="margin-bottom:16px">
+      <div class="detail" style="margin-bottom:18px">
         <div class="item"><div class="label">Korisničko ime</div><div class="value">${esc(u.username)}</div></div>
         <div class="item"><div class="label">Uloga</div><div class="value">${ROLE[u.role]}</div></div>
       </div>
-      ${canEdit ? `
       <form id="f">
         <label>Ime i prezime<input name="full_name" value="${esc(u.full_name)}" required></label>
         ${u.role !== 'super_admin' ? `<label>Uloga<select name="role"><option value="user" ${u.role === 'user' ? 'selected' : ''}>Zaposlenik</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
-        <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:16px;color:var(--ink)"><input type="checkbox" name="active" style="width:22px;height:22px" ${u.active ? 'checked' : ''}> Račun aktivan</label>` : ''}
-        <button class="btn" type="submit">Spremi</button>
+        <label class="switch-row"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}> Račun aktivan</label>` : ''}
+        <button class="btn tap" type="submit">Spremi</button>
       </form>
-      <form id="p" style="margin-top:22px">
+      <form id="p" style="margin-top:24px">
         <label>Novi PIN<input name="pin" class="pin" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" required></label>
-        <button class="btn secondary" type="submit">Postavi novi PIN</button>
+        <button class="btn secondary tap" type="submit">Postavi novi PIN</button>
       </form>
-      <div class="err" id="err"></div>` : ''}`,
+      <div class="err" id="err"></div>`,
   });
-  if (!canEdit) return;
   const f = document.getElementById('f');
   f.onsubmit = async (e) => {
     e.preventDefault();
@@ -737,7 +829,7 @@ function renderMyPin() {
         <label>Novi PIN (4 do 8 brojeva)<input name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" required></label>
         <label>Ponovi PIN<input name="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" required></label>
         <div class="err" id="err"></div>
-        <button class="btn" type="submit">Spremi</button>
+        <button class="btn tap" type="submit">Spremi</button>
       </form>`,
   });
   const f = document.getElementById('f');
@@ -755,6 +847,7 @@ async function route() {
   const params = new URLSearchParams(qs || '');
   const p = (path || '/').split('/').filter(Boolean);
   if (!isAdmin() && !['', 'pin'].includes(p[0] || '')) return renderTodo();
+  if (!isSuper() && ['admin', 'radnje', 'korisnici'].includes(p[0])) return renderHome();
   switch (p[0]) {
     case undefined: return renderHome();
     case 'pin': return renderMyPin();
@@ -763,16 +856,20 @@ async function route() {
       if (p[1] === 'new') return renderCateringForm();
       if (p[2] === 'edit') return renderCateringForm(p[1]);
       return renderCateringDetail(p[1]);
+    case 'restoran': return renderRestoranMenu();
+    case 'jelovnik': return renderMenuList(false);
+    case 'dostava': return renderMenuList(true);
     case 'nabavka': return p[1] ? renderSupplier(p[1]) : renderSuppliers();
     case 'artikli': return renderAllItems();
     case 'dobavljac': return p[1] === 'new' ? renderSupplierForm() : renderSupplierForm(p[1]);
     case 'artikl': return p[1] === 'new' ? renderItemForm(null, params.get('s')) : renderItemForm(p[1]);
-    case 'restoran': return renderRestoran();
     case 'jelo':
       if (p[1] === 'new') return renderDishForm();
       if (p[2] === 'edit') return renderDishForm(p[1]);
       return renderDish(p[1]);
     case 'todo': return p[1] === 'new' ? renderTaskForm() : renderTodo();
+    case 'admin': return renderAdmin();
+    case 'radnje': return renderActivity();
     case 'korisnici':
       if (!p[1]) return renderUsers();
       if (p[1] === 'new') return renderUserNew();
