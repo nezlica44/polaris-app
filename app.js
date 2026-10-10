@@ -538,9 +538,10 @@ async function renderDish(id) {
 
 async function renderDishForm(id) {
   let d = { vat_rate: 13, dish_ingredients: [] };
-  let items = [];
+  let items = [], cats = [];
   try {
     items = await q(sb.from('items').select('id, name, unit, suppliers(name)').order('name'));
+    cats = await q(sb.from('dishes').select('category, sort').order('sort'));
     if (id) d = await q(sb.from('dishes').select('*, dish_ingredients(*)').eq('id', id).single());
   } catch (e) { toast(errText(e)); }
   const label = (i) => `${i.name} (${i.suppliers?.name || ''})`;
@@ -548,6 +549,11 @@ async function renderDishForm(id) {
   const byId = new Map(items.map((i) => [i.id, i]));
   const ings = (d.dish_ingredients || []).sort((a, b) => a.sort - b.sort);
   const back = id ? `/jelo/${id}` : '/jelovnik';
+  // kategorije redom kao na jelovniku, s najvećim sort brojem u svakoj
+  const catMax = new Map();
+  cats.forEach((c) => { if (c.category) catMax.set(c.category, Math.max(catMax.get(c.category) ?? -1, c.sort)); });
+  const maxSort = cats.reduce((m, c) => Math.max(m, c.sort), 0);
+  const catNames = [...catMax.keys()];
   const ingRow = (g = {}) => {
     const it = g.item_id && byId.get(g.item_id);
     return `<div class="ing">
@@ -562,7 +568,14 @@ async function renderDishForm(id) {
     body: `
       <form id="f">
         <label>Naziv jela<input name="name" value="${esc(d.name)}" required></label>
-        <label>Kategorija<input name="category" value="${esc(d.category)}" placeholder="npr. Roštilj, Pizze, Salate"></label>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--muted);padding-left:4px;margin-bottom:8px">U koju kategoriju ide?</div>
+          <div class="catpick">
+            ${catNames.map((c) => `<label class="catchip"><input type="radio" name="cat" value="${esc(c)}" ${c === d.category ? 'checked' : ''}><span>${esc(c)}</span></label>`).join('')}
+            <label class="catchip"><input type="radio" name="cat" value="__new" ${!catNames.length || (d.category && !catNames.includes(d.category)) ? 'checked' : ''}><span>+ Nova kategorija</span></label>
+          </div>
+          <input name="category_new" id="catnew" value="${esc(d.category && !catNames.includes(d.category) ? d.category : '')}" placeholder="npr. Jela s roštilja, Pizze, Salate" style="margin-top:10px" ${!catNames.length || (d.category && !catNames.includes(d.category)) ? '' : 'hidden'}>
+        </div>
         <label>Opis na jelovniku<input name="description" value="${esc(d.description)}" placeholder="npr. 10 kom, lepinja, luk, kajmak"></label>
         <div class="grid2">
           <label>Cijena s PDV-om (€)<input name="price" inputmode="decimal" value="${esc(d.price)}"></label>
@@ -596,12 +609,17 @@ async function renderDishForm(id) {
     else if (it && it.unit === 'l') unitSel.value = 'ml';
     else if (it) unitSel.value = it.unit;
   };
+  f.querySelectorAll('[name=cat]').forEach((r) => (r.onchange = () => {
+    const n = document.getElementById('catnew');
+    n.hidden = f.cat.value !== '__new';
+    if (!n.hidden) n.focus();
+  }));
   f.on_delivery.onchange = () => { document.getElementById('dp').hidden = !f.on_delivery.checked; };
   f.onsubmit = async (e) => {
     e.preventDefault();
     const err = document.getElementById('err');
     const row = {
-      name: val(f, 'name'), category: val(f, 'category'), description: val(f, 'description'), price: numVal(f, 'price'), vat_rate: numVal(f, 'vat_rate'),
+      name: val(f, 'name'), category: f.cat.value === '__new' ? val(f, 'category_new') : f.cat.value || null, description: val(f, 'description'), price: numVal(f, 'price'), vat_rate: numVal(f, 'vat_rate'),
       on_delivery: f.on_delivery.checked, delivery_price: numVal(f, 'delivery_price'), recipe: val(f, 'recipe'),
     };
     const lines = [];
@@ -615,7 +633,9 @@ async function renderDishForm(id) {
       const it = byLabel.get(name);
       lines.push({ item_id: it?.id || null, name: it ? it.name : name, qty, unit: el.querySelector('[name=ing_unit]').value, sort: idx });
     });
+    if (!row.category) { err.textContent = 'Odaberi kategoriju ili upiši novu.'; return; }
     if (bad) { err.textContent = 'Svaki sastojak treba naziv i količinu (broj).'; return; }
+    if (!id || row.category !== d.category) row.sort = catMax.has(row.category) ? catMax.get(row.category) + 1 : maxSort + 10;
     try {
       let dishId = id;
       if (id) await q(sb.from('dishes').update(row).eq('id', id));
