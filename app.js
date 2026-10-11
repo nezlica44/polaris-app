@@ -171,6 +171,135 @@ async function renderHome() {
 }
 
 /* ---------- CATERING ---------- */
+// Paketi i pravila kalkulatora (Nevio, 11.10.2026.). "Pretpostavka" = Nevio još treba potvrditi.
+const MEAT = {
+  becki: { name: 'Pileći bečki mini', piece: 50, from: 'pilećeg filea' },
+  raznjici: { name: 'Pileći ražnjići', piece: 100 },
+  vrat: { name: 'Svinjski vrat' },
+  cevapi: { name: 'Ćevapi', piece: 20 },
+  batak: { name: 'Otkošteni batak' },
+  pljeskavice: { name: 'Mini pljeskavice' },
+};
+const MEAT_12 = ['becki', 'raznjici', 'vrat', 'cevapi'];
+const MEAT_34 = [...MEAT_12, 'batak', 'pljeskavice'];
+const SIDES_12 = ['Pekarski krumpir', 'Kroketi', 'Riža'];
+const SIDES_34 = [...SIDES_12, 'Chili cheese nuggets', 'Mozzarella sticks'];
+const PACKAGES = {
+  1: { price: 13, meat: MEAT_12, meatPer3: 1, side: 300, sides: SIDES_12, laz: [], salads: ['Miješana'], saladRate: [2, 10], breads: ['Obične'] },
+  2: { price: 16, meat: MEAT_12, meatPer3: 1, side: 300, sides: SIDES_12, laz: ['Njoki 4 vrste sira', 'Rižoto chili'], salads: ['Miješana', 'Šopska'], saladRate: [2, 10], breads: ['Obične', 'Sa sirom'] },
+  // paket 3: 1,2 kg mesa na 3 osobe (pretpostavka, u poruci piše "po osobi")
+  3: { price: 20, meat: MEAT_34, meatPer3: 1.2, side: 400, sides: SIDES_34, laz: ['Njoki 4 vrste sira', 'Rižoto chili'], salads: ['Miješana', 'Šopska', 'Rukola cherry'], saladRate: [3, 12], breads: ['Obične', 'Sa sirom'] },
+  // paket 4: meso, prilozi i salate računaju se kao paket 3 (pretpostavka)
+  4: {
+    price: 30, meat: MEAT_34, meatPer3: 1.2, side: 400, sides: [...SIDES_34, 'Pohani karfiol'], laz: ['Njoki 4 vrste sira', 'Rižoto chili', 'Rižoto curry'],
+    salads: ['Miješana', 'Šopska', 'Rukola cherry', 'Šareni kupus-mrkva'], saladRate: [3, 12], breads: ['Obične', 'Sa sirom', 'S češnjakom'], soup: 'Juha (3 vrste)', dessert: 'Domaći kolači',
+  },
+};
+const EXTRA = { cutlery: 2.5, table: 25, barTable: 15 };
+const LAZ_G = 300; // jedna lazanjera = porcija od oko 300 g
+const LAZ_PER = 30; // g po osobi od svakog priloga iz lazanjere
+const BREAD_PER_10 = 2; // krugova lepinjica na 10 ljudi
+const BANJICA_PEOPLE = 15; // pretpostavka: 1 banjica na 15 ljudi
+const SOUP_DL = 2.5; // pretpostavka: dl juhe po osobi
+const CAKES = 2; // pretpostavka: kolača po osobi
+
+const split = (total, k) => Array.from({ length: k }, (_, i) => Math.floor(total / k) + (i < total % k ? 1 : 0));
+const ceil = (x) => Math.ceil(x - 1e-9);
+const up50 = (g) => ceil(g / 50) * 50;
+const kgTxt = (g) => (g >= 1000 ? `${num(g / 1000, 2)} kg` : `${Math.round(g)} g`);
+const krug = (n) => `${n} ${plural(n, 'krug', 'kruga', 'krugova')}`;
+
+function cateringCalc(c) {
+  const n = Math.max(0, Number(c.people) || 0);
+  const P = PACKAGES[c.package];
+  const k = { n, P, pkg: c.package, lines: [], tables: Number(c.tables) || 0, barTables: Number(c.bar_tables) || 0, cutlery: !!c.cutlery && n > 0 };
+  if (P && n) k.lines.push([`Paket ${c.package}`, `${n} × ${eur(P.price)}`, P.price * n]);
+  if (k.cutlery) k.lines.push(['Beštek', `${n} × ${eur(EXTRA.cutlery)}`, EXTRA.cutlery * n]);
+  if (k.tables) k.lines.push(['Stol + stolnjak', `${k.tables} × ${eur(EXTRA.table)}`, EXTRA.table * k.tables]);
+  if (k.barTables) k.lines.push(['Barski stol + presvlaka', `${k.barTables} × ${eur(EXTRA.barTable)}`, EXTRA.barTable * k.barTables]);
+  k.total = k.lines.reduce((s, l) => s + l[2], 0);
+  if (!P || !n) return k;
+  // meso: kg na 3 osobe, jednako po vrstama; komadi se zaokružuju na više
+  const share = (n * P.meatPer3 * 1000) / 3 / P.meat.length;
+  k.meat = P.meat.map((key) => {
+    const m = MEAT[key];
+    if (!m.piece) return { ...m, g: up50(share) };
+    const pcs = ceil(share / m.piece);
+    return { ...m, pcs, g: pcs * m.piece };
+  });
+  k.meatG = k.meat.reduce((s, m) => s + m.g, 0);
+  // prilozi: njoki i rižoto idu u lazanjere (30 g po osobi od svakog), ostalo u banjicu
+  k.lazanjere = P.laz.length ? Math.max(P.laz.length, ceil((n * LAZ_PER * P.laz.length) / LAZ_G)) : 0;
+  k.laz = split(k.lazanjere, P.laz.length).map((cnt, i) => ({ name: P.laz[i], cnt, g: cnt * LAZ_G }));
+  const sideG = (n * (P.side - LAZ_PER * P.laz.length)) / P.sides.length;
+  k.sides = P.sides.map((name) => ({ name, g: up50(sideG) }));
+  k.sideG = [...k.sides, ...k.laz].reduce((s, x) => s + x.g, 0);
+  // salate i lepinjice: barem jedna od svake vrste
+  k.saladN = Math.max(P.salads.length, ceil((n * P.saladRate[0]) / P.saladRate[1]));
+  k.salads = split(k.saladN, P.salads.length).map((cnt, i) => ({ name: P.salads[i], cnt }));
+  k.breadN = Math.max(P.breads.length, ceil((n * BREAD_PER_10) / 10));
+  k.breads = split(k.breadN, P.breads.length).map((cnt, i) => ({ name: P.breads[i], cnt }));
+  k.banjice = ceil(n / BANJICA_PEOPLE);
+  if (P.soup) k.soupL = (n * SOUP_DL) / 10;
+  if (P.dessert) k.cakes = n * CAKES;
+  return k;
+}
+
+// medijan cijene mesa iz Nabavke (€/kg bez PDV-a)
+const MEAT_RE = /ćevap|cevap|vrat|batak|file|piletin|pileć|pilec|bečk|beck|ražnj|raznj|pljeskav|svinj|junet|teleć|telec|janje|kobasic|meso|mesa\b/i;
+function meatMedian(items) {
+  const p = (items || [])
+    .filter((i) => MEAT_RE.test(i.name) && Number(i.price_net) > 0 && BASE[i.unit]?.[0] === 'kg')
+    .map((i) => Number(i.price_net) / BASE[i.unit][1])
+    .sort((a, b) => a - b);
+  if (!p.length) return null;
+  const m = p.length >> 1;
+  return { price: p.length % 2 ? p[m] : (p[m - 1] + p[m]) / 2, count: p.length };
+}
+
+function calcView(k, med, priceFirst) {
+  const krow = (name, v, sub, cls = '') => `<div class="krow ${cls}"><span>${esc(name)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="v">${esc(v)}</span></div>`;
+  const group = (title, right, rows) => `<div class="kgroup"><div class="khead"><span>${esc(title)}</span><span>${esc(right)}</span></div>${rows}</div>`;
+  let buy = '', take = '', price = '';
+  if (k.meat) {
+    buy = `<div class="section-title">Za kupiti</div><div class="kcard">
+      ${group('Meso', kgTxt(k.meatG), k.meat.map((m) => (m.pcs ? krow(m.name, `${m.pcs} kom`, `${m.pcs} × ${m.piece} g = ${kgTxt(m.g)}${m.from ? ` ${m.from}` : ''}`) : krow(m.name, kgTxt(m.g)))).join(''))}
+      ${group('Prilozi', kgTxt(k.sideG), [...k.sides.map((s) => krow(s.name, kgTxt(s.g))), ...k.laz.map((s) => krow(s.name, kgTxt(s.g), `${s.cnt} ${plural(s.cnt, 'lazanjera', 'lazanjere', 'lazanjera')}`))].join(''))}
+      ${group('Salate', `${k.saladN} ${plural(k.saladN, 'salata', 'salate', 'salata')}`, k.salads.map((s) => krow(s.name, `× ${s.cnt}`)).join(''))}
+      ${group('Lepinjice', krug(k.breadN), k.breads.map((s) => krow(s.name, krug(s.cnt))).join(''))}
+      ${k.soupL ? group('Predjelo', '', krow(k.P.soup, `${num(k.soupL, 1)} l`, `${num(SOUP_DL, 1)} dl po osobi`)) : ''}
+      ${k.cakes ? group('Desert', '', krow(k.P.dessert, `${k.cakes} kom`, `${CAKES} po osobi`)) : ''}
+    </div>`;
+  }
+  const parts = [];
+  if (k.meat) {
+    parts.push(`<div class="ksum">${[
+      `${k.banjice} ${plural(k.banjice, 'banjica', 'banjice', 'banjica')}`,
+      k.lazanjere && `${k.lazanjere} ${plural(k.lazanjere, 'lazanjera', 'lazanjere', 'lazanjera')}`,
+      `${k.saladN} ${plural(k.saladN, 'salata', 'salate', 'salata')}`,
+      `${krug(k.breadN)} lepinjica${k.breads.length > 1 ? ` (${k.breads.filter((b) => b.cnt).map((b) => `${b.name.toLowerCase()} ${b.cnt}`).join(', ')})` : ''}`,
+      k.soupL && 'juha (3 vrste)',
+      k.cakes && 'domaći kolači',
+    ].filter(Boolean).map(esc).join(' · ')}</div>`);
+  }
+  if (k.cutlery) parts.push(group('Beštek', `${k.n} ${plural(k.n, 'osoba', 'osobe', 'osoba')}`, [['Tanjuri'], ['Vilice'], ['Noževi'], ['Čaše'], ['Salvete']].map(([t]) => krow(t, String(k.n))).join('')));
+  if (k.tables || k.barTables) parts.push(group('Stolovi', '', (k.tables ? krow('Stol + stolnjak', String(k.tables)) : '') + (k.barTables ? krow('Barski stol + presvlaka', String(k.barTables)) : '')));
+  if (parts.length) take = `<div class="section-title">Za ponijeti</div><div class="kcard">${parts.join('')}</div>`;
+  if (k.lines.length) {
+    let note = '';
+    if (k.meat) {
+      note = med
+        ? `<div class="knote">Trošak mesa, procjena: ${kgTxt(k.meatG)} × ${eur(med.price)}/kg = <b>${eur((k.meatG / 1000) * med.price)}</b> (medijan cijena mesa iz Nabavke, bez PDV-a)</div>`
+        : '<div class="knote">Za procjenu troška mesa dodaj meso s cijenom po kg u Nabavku.</div>';
+    }
+    price = `<div class="section-title">Cijena</div><div class="kcard">
+      ${k.lines.map(([t, sub, v]) => krow(t, eur(v), sub)).join('')}
+      ${krow('Ukupno', eur(k.total), '', 'total')}${note}
+    </div>`;
+  }
+  return priceFirst ? price + take + buy : buy + take + price;
+}
+
 function dayCard(date, events, past) {
   const d = parseDate(date);
   const n = events.length;
@@ -188,6 +317,7 @@ function dayCard(date, events, past) {
             <span class="meta">
               ${c.event_time ? `<span>${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
               ${c.people ? `<span>${ICON.people}${c.people}</span>` : ''}
+              ${c.package ? `<span class="ptag">${n >= 3 ? 'P' : 'Paket '}${c.package}</span>` : ''}
               ${n >= 3 && c.location ? `<span class="one" style="display:block">${esc(c.location)}</span>` : ''}
             </span>
             ${n < 3 && c.location ? `<span class="loc">${ICON.pin}<span class="one">${esc(c.location)}</span></span>` : ''}
@@ -203,27 +333,46 @@ function groupByDate(rows) {
   return [...m.entries()].sort((x, y) => x[0].localeCompare(y[0]));
 }
 
+let cateringTab = 'next'; // 'next' | 'past', pamti se dok je aplikacija otvorena
 async function renderCateringList() {
   loading('Catering', '/');
   try {
-    const rows = await q(sb.from('caterings').select('id, event_date, event_time, people, title, location').order('event_date').order('event_time', { nullsFirst: false }));
+    const rows = await q(sb.from('caterings').select('id, event_date, event_time, people, title, location, package').order('event_date').order('event_time', { nullsFirst: false }));
     const t = todayStr();
-    const upcoming = groupByDate(rows.filter((r) => r.event_date >= t));
-    const past = groupByDate(rows.filter((r) => r.event_date < t)).reverse().slice(0, 15);
-    let body = '';
-    if (!rows.length) body = '<div class="empty">Još nema cateringa.<br>Dodaj prvi na +</div>';
-    else {
-      body += upcoming.length ? `<div class="list">${upcoming.map(([d, ev]) => dayCard(d, ev)).join('')}</div>` : '<div class="empty">Nema nadolazećih cateringa.</div>';
-      if (past.length) body += `<div class="section-title">Prošli</div><div class="list">${past.map(([d, ev]) => dayCard(d, ev, true)).join('')}</div>`;
-    }
-    screen({ title: 'Catering', back: '/', action: '/catering/new', body });
+    const tabs = { next: groupByDate(rows.filter((r) => r.event_date >= t)), past: groupByDate(rows.filter((r) => r.event_date < t)).reverse() };
+    const count = (days) => days.reduce((s, [, ev]) => s + ev.length, 0);
+    const list = () => {
+      const days = tabs[cateringTab];
+      if (!days.length) return `<div class="empty">${cateringTab === 'past' ? 'Nema prošlih cateringa.' : 'Nema nadolazećih cateringa.<br>Dodaj novi na +'}</div>`;
+      return `<div class="list">${days.map(([d, ev]) => dayCard(d, ev, cateringTab === 'past')).join('')}</div>`;
+    };
+    screen({
+      title: 'Catering', back: '/', action: '/catering/new',
+      body: `
+        <div class="seg ${cateringTab === 'past' ? 'right' : ''}">
+          <button type="button" data-tab="next" class="${cateringTab === 'next' ? 'on' : ''}">Nadolazeći<span class="c">${count(tabs.next)}</span></button>
+          <button type="button" data-tab="past" class="${cateringTab === 'past' ? 'on' : ''}">Prošli<span class="c">${count(tabs.past)}</span></button>
+        </div>
+        <div id="clist">${list()}</div>`,
+    });
+    const seg = app.querySelector('.seg');
+    seg.onclick = (e) => {
+      const b = e.target.closest('[data-tab]');
+      if (!b || b.dataset.tab === cateringTab) return;
+      cateringTab = b.dataset.tab;
+      seg.classList.toggle('right', cateringTab === 'past');
+      seg.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('on', x === b));
+      document.getElementById('clist').innerHTML = list();
+    };
   } catch (e) { failed('Catering', '/', e); }
 }
+
+const loadItems = () => sb.from('items').select('name, unit, price_net').then((r) => r.data || [], () => []);
 
 async function renderCateringDetail(id) {
   loading('Catering', '/catering');
   try {
-    const c = await q(sb.from('caterings').select('*').eq('id', id).single());
+    const [c, items] = await Promise.all([q(sb.from('caterings').select('*').eq('id', id).single()), loadItems()]);
     const d = parseDate(c.event_date);
     const item = (label, v) => (v ? `<div class="item"><div class="label">${label}</div><div class="value">${esc(v)}</div></div>` : '');
     const hasDetails = c.location || c.contact || c.description || c.platters || c.extras;
@@ -234,6 +383,7 @@ async function renderCateringDetail(id) {
           <div class="bigdate">${d.getDate()}. ${MONTHS[d.getMonth()]}</div>
           <div class="muted">${DAYS_FULL[d.getDay()]}, ${fmtDateShort(c.event_date)}</div>
           <div class="chips">
+            ${c.package ? `<span class="chip gold">Paket ${c.package}</span>` : ''}
             ${c.event_time ? `<span class="chip">${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
             ${c.people ? `<span class="chip">${ICON.people}${c.people} ${plural(c.people, 'osoba', 'osobe', 'osoba')}</span>` : ''}
           </div>
@@ -245,6 +395,7 @@ async function renderCateringDetail(id) {
           ${item('Banjice', c.platters)}
           ${item('Dodatno', c.extras)}
         </div>` : ''}
+        ${calcView(cateringCalc(c), meatMedian(items))}
         <div class="actions">
           <button class="btn secondary tap" data-go="/catering/${c.id}/edit">Uredi</button>
           <button class="btn danger" id="del">Obriši catering</button>
@@ -256,6 +407,23 @@ async function renderCateringDetail(id) {
     };
   } catch (e) { failed('Catering', '/catering', e); }
 }
+
+function pkgButton(p, selected) {
+  const P = PACKAGES[p];
+  const sides = P.sides.length + P.laz.length;
+  return `
+    <button type="button" class="pkg tap ${Number(selected) === p ? 'on' : ''}" data-pkg="${p}" aria-pressed="${Number(selected) === p}">
+      <span class="pn">Paket ${p}</span>
+      <span class="pp">${num(P.price)} €<small> / osoba</small></span>
+      <span class="pd">${P.meat.length} ${plural(P.meat.length, 'vrsta', 'vrste', 'vrsta')} mesa · ${sides} ${plural(sides, 'prilog', 'priloga', 'priloga')}<br>${P.salads.length} ${plural(P.salads.length, 'salata', 'salate', 'salata')}${P.soup ? ' · juha · desert' : ''}</span>
+    </button>`;
+}
+const stepper = (name, title, sub, v) => `
+  <div class="xrow">
+    <span class="xt">${title}<small>${sub}</small></span>
+    <span class="stepper"><button type="button" class="tap" data-step="${name}" data-d="-1" aria-label="Manje">−</button><output id="o_${name}">${v || 0}</output><button type="button" class="tap" data-step="${name}" data-d="1" aria-label="Više">+</button></span>
+    <input type="hidden" name="${name}" value="${v || 0}">
+  </div>`;
 
 async function renderCateringForm(id) {
   let c = { event_date: todayStr() };
@@ -272,22 +440,65 @@ async function renderCateringForm(id) {
           <label>Datum<input name="event_date" type="date" value="${esc(c.event_date)}" required></label>
           <label>Vrijeme<input name="event_time" type="time" value="${esc(c.event_time?.slice(0, 5))}"></label>
         </div>
-        <label>Broj ljudi<input name="people" type="number" inputmode="numeric" min="0" value="${esc(c.people)}"></label>
         <label>Lokacija<input name="location" value="${esc(c.location)}" placeholder="npr. Sala Luma, J.J. Strossmayera 271"></label>
         <label>Kontakt<input name="contact" value="${esc(c.contact)}" placeholder="ime i broj mobitela"></label>
-        <label>Opis i napomene<textarea name="description" style="min-height:200px" placeholder="hrana, banjice, pizze, napomene…">${esc(desc)}</textarea></label>
+        <div class="ftitle">Paket</div>
+        <div class="pkgs">${[1, 2, 3, 4].map((p) => pkgButton(p, c.package)).join('')}</div>
+        <input type="hidden" name="package" value="${esc(c.package)}">
+        <label>Broj ljudi<input name="people" type="number" inputmode="numeric" min="0" value="${esc(c.people)}" placeholder="npr. 15"></label>
+        <div class="xopts">
+          <label class="xrow"><span class="xt">Beštek<small>tanjur, pribor, čaša, salveta · ${eur(EXTRA.cutlery)} po osobi</small></span><input type="checkbox" class="sw" name="cutlery" ${c.cutlery ? 'checked' : ''}></label>
+          ${stepper('tables', 'Stol + stolnjak', `${eur(EXTRA.table)} po stolu`, c.tables)}
+          ${stepper('bar_tables', 'Barski stol + presvlaka', `${eur(EXTRA.barTable)} po stolu`, c.bar_tables)}
+        </div>
+        <div id="calc"></div>
+        <label>Opis i napomene<textarea name="description" style="min-height:140px" placeholder="posebni zahtjevi, alergije, pizze, napomene…">${esc(desc)}</textarea></label>
         <div class="err" id="err"></div>
         <button class="btn tap" type="submit">Spremi</button>
       </form>`,
   });
   const f = document.getElementById('f');
+  let med = null;
+  const state = () => ({
+    package: Number(f.elements.package.value) || null, people: numVal(f, 'people'), cutlery: f.elements.cutlery.checked,
+    tables: Number(f.elements.tables.value) || 0, bar_tables: Number(f.elements.bar_tables.value) || 0,
+  });
+  const redraw = () => {
+    const s = state();
+    const box = document.getElementById('calc');
+    if (s.package && !s.people) { box.innerHTML = '<p class="muted small center">Upiši broj ljudi i odmah vidiš što treba kupiti.</p>'; return; }
+    box.innerHTML = calcView(cateringCalc(s), med, true);
+  };
+  f.addEventListener('click', (e) => {
+    const p = e.target.closest('[data-pkg]');
+    if (p) {
+      const on = !p.classList.contains('on'); // ponovni dodir na odabrani paket ga poništava
+      f.querySelectorAll('[data-pkg]').forEach((b) => { b.classList.toggle('on', on && b === p); b.setAttribute('aria-pressed', String(on && b === p)); });
+      f.elements.package.value = on ? p.dataset.pkg : '';
+      redraw();
+      return;
+    }
+    const s = e.target.closest('[data-step]');
+    if (s) {
+      const inp = f.elements[s.dataset.step];
+      inp.value = Math.max(0, Math.min(99, (Number(inp.value) || 0) + Number(s.dataset.d)));
+      document.getElementById(`o_${s.dataset.step}`).textContent = inp.value;
+      redraw();
+    }
+  });
+  f.people.addEventListener('input', redraw);
+  f.cutlery.addEventListener('change', redraw);
+  redraw();
+  loadItems().then((items) => { med = meatMedian(items); if (document.getElementById('calc')) redraw(); });
   f.onsubmit = async (e) => {
     e.preventDefault();
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    const s = state();
     const row = {
       title: val(f, 'title'), event_date: val(f, 'event_date'), event_time: val(f, 'event_time'),
-      people: numVal(f, 'people'), location: val(f, 'location'), contact: val(f, 'contact'),
+      people: s.people, location: val(f, 'location'), contact: val(f, 'contact'),
       description: val(f, 'description'), platters: null, extras: null,
+      package: s.package, cutlery: s.cutlery, tables: s.tables, bar_tables: s.bar_tables,
     };
     try {
       if (id) { await q(sb.from('caterings').update(row).eq('id', id)); go(`/catering/${id}`); }

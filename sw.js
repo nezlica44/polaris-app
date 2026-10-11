@@ -1,6 +1,6 @@
 // Mreža prvo, cache kao rezerva (aplikacija uvijek dobije zadnju verziju kad ima interneta)
-const CACHE = 'polaris-v5';
-const SHELL = ['./', 'index.html', 'style.css?v=5', 'app.js?v=5', 'supabase.js?v=2.45.4', 'manifest.webmanifest', 'icon-192.png', 'polaris-logo.png'];
+const CACHE = 'polaris-v6';
+const SHELL = ['./', 'index.html', 'style.css?v=6', 'app.js?v=6', 'supabase.js?v=2.45.4', 'manifest.webmanifest', 'icon-192.png', 'polaris-logo.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))));
