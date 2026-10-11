@@ -49,6 +49,10 @@ const ICON = {
   cart: svg('<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>'),
   users: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
   activity: svg('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
+  scale: svg('<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'),
+  cup: svg('<path d="m6 8 1.75 12.28a2 2 0 0 0 2 1.72h4.54a2 2 0 0 0 2-1.72L18 8"/><path d="M5 8h14"/><path d="M7 15a6.47 6.47 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/><path d="m12 8 1-6h2"/>'),
+  spray: svg('<path d="M3 3h.01"/><path d="M7 5h.01"/><path d="M11 7h.01"/><path d="M3 7h.01"/><path d="M7 9h.01"/><path d="M3 11h.01"/><rect width="4" height="4" x="15" y="5"/><path d="m19 9 2 2v10c0 .6-.4 1-1 1h-6c-.6 0-1-.4-1-1V11l2-2"/><path d="m13 14 8-2"/><path d="m13 19 8-2"/>'),
+  note: svg('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'),
 };
 const LOGO = '<img src="polaris-logo.png" alt="Polaris" class="logo" onerror="this.remove()">';
 
@@ -147,7 +151,7 @@ async function renderHome() {
         <div class="home-hero">${LOGO}<div class="hello">Bok, ${esc(me.full_name)}</div></div>
         <div class="menu">
           ${menuBtn('/catering', 'calendar', 'green', 'Catering', cat)}
-          ${menuBtn('/restoran', 'utensils', 'gold', 'Restoran', 'Jelovnik, dostava, nabavka')}
+          ${menuBtn('/restoran', 'utensils', 'gold', 'Restoran', 'Jelovnik, normativ, nabavka')}
           ${menuBtn('/todo', 'todo', 'green', 'To-do', todo)}
         </div>
         <div class="footer-links">
@@ -174,7 +178,7 @@ async function renderHome() {
 // Paketi i pravila kalkulatora (Nevio, 11.10.2026.). "Pretpostavka" = Nevio još treba potvrditi.
 const MEAT = {
   becki: { name: 'Pileći bečki mini', piece: 50, from: 'pilećeg filea' },
-  raznjici: { name: 'Pileći ražnjići', piece: 100 },
+  raznjici: { name: 'Pileći ražnjići', piece: 50 },
   vrat: { name: 'Svinjski vrat' },
   cevapi: { name: 'Ćevapi', piece: 20 },
   batak: { name: 'Otkošteni batak' },
@@ -199,6 +203,7 @@ const EXTRA = { cutlery: 2.5, table: 25, barTable: 15 };
 const LAZ_G = 300; // jedna lazanjera = porcija od oko 300 g
 const LAZ_PER = 30; // g po osobi od svakog priloga iz lazanjere
 const BREAD_PER_10 = 2; // krugova lepinjica na 10 ljudi
+const BREAD_PCS = 8; // lepinjica u krugu (2 kruga = 16 lepinjica)
 const BANJICA_PEOPLE = 15; // pretpostavka: 1 banjica na 15 ljudi
 const SOUP_DL = 2.5; // pretpostavka: dl juhe po osobi
 const CAKES = 2; // pretpostavka: kolača po osobi
@@ -245,7 +250,48 @@ function cateringCalc(c) {
   return k;
 }
 
-// medijan cijene mesa iz Nabavke (€/kg bez PDV-a)
+// Cijene iz Nabavke: stavka kalkulatora traži Food artikl po riječima iz naziva (bez kvačica, "!" = ne smije sadržavati).
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+const MATCH = {
+  'Pileći bečki mini': [['beck'], ['pileci', 'file']],
+  'Pileći ražnjići': [['raznj'], ['pileci', 'file']],
+  'Svinjski vrat': [['vrat']],
+  'Ćevapi': [['cevap']],
+  'Otkošteni batak': [['batak'], ['bataci']],
+  'Mini pljeskavice': [['pljeskav']],
+  'Pekarski krumpir': [['krumpir'], ['krompir']],
+  'Kroketi': [['kroket']],
+  'Riža': [['riza']],
+  'Chili cheese nuggets': [['nugget']],
+  'Mozzarella sticks': [['mozzarella', 'stick'], ['mozarela', 'stick']],
+  'Pohani karfiol': [['karfiol'], ['cvjetac']],
+  'Njoki 4 vrste sira': [['njok']],
+  'Rižoto chili': [['rizoto', 'chili'], ['rizoto', 'cili']],
+  'Rižoto curry': [['rizoto', 'curry'], ['rizoto', 'kari']],
+  'Miješana': [['mijesana', 'salat']],
+  'Šopska': [['sopsk']],
+  'Rukola cherry': [['rukola', 'salat']],
+  'Šareni kupus-mrkva': [['kupus', 'salat']],
+  'Obične': [['lepinj', '!sir', '!cesnj']],
+  'Sa sirom': [['lepinj', 'sir']],
+  'S češnjakom': [['lepinj', 'cesnj']],
+};
+function findItem(items, name) {
+  for (const alt of MATCH[name] || []) {
+    const hit = items.filter((i) => alt.every((t) => (t[0] === '!' ? !i.n.includes(t.slice(1)) : i.n.includes(t))));
+    if (hit.length) return hit.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+  }
+  return null;
+}
+// trošak stavke: po težini (g) ako je artikl u kg/g, po komadu ako je artikl u kom
+function itemCost(it, g, pieces) {
+  if (!it || !(Number(it.price_net) > 0)) return null;
+  const b = BASE[it.unit];
+  if (b?.[0] === 'kg' && g) return (g / 1000 / b[1]) * Number(it.price_net);
+  if (b?.[0] === 'kom' && pieces) return pieces * Number(it.price_net);
+  return null;
+}
+// medijan cijene mesa iz Nabavke (€/kg bez PDV-a), za meso koje nema svoj artikl
 const MEAT_RE = /ćevap|cevap|vrat|batak|file|piletin|pileć|pilec|bečk|beck|ražnj|raznj|pljeskav|svinj|junet|teleć|telec|janje|kobasic|meso|mesa\b/i;
 function meatMedian(items) {
   const p = (items || [])
@@ -256,48 +302,79 @@ function meatMedian(items) {
   const m = p.length >> 1;
   return { price: p.length % 2 ? p[m] : (p[m - 1] + p[m]) / 2, count: p.length };
 }
+function costCalc(k, items) {
+  if (!k.meat || !items) return k;
+  const food = items.filter((i) => (i.category || 'food') === 'food').map((i) => ({ ...i, n: norm(i.name) }));
+  k.med = meatMedian(food);
+  k.meat.forEach((m) => {
+    m.cost = itemCost(findItem(food, m.name), m.g, m.pcs);
+    if (m.cost == null && k.med) { m.cost = (m.g / 1000) * k.med.price; m.median = true; }
+  });
+  [...k.sides, ...k.laz].forEach((s) => { s.cost = itemCost(findItem(food, s.name), s.g); });
+  k.salads.forEach((s) => { s.cost = itemCost(findItem(food, s.name), 0, s.cnt); });
+  k.breads.forEach((s) => { s.cost = itemCost(findItem(food, s.name), 0, s.cnt * BREAD_PCS); });
+  k.priced = true;
+  return k;
+}
 
-function calcView(k, med, priceFirst) {
-  const krow = (name, v, sub, cls = '') => `<div class="krow ${cls}"><span>${esc(name)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="v">${esc(v)}</span></div>`;
+const sumCost = (rows) => rows.reduce((s, x) => s + (x.cost || 0), 0);
+function calcView(k) {
+  const money = (x) => (x.cost != null ? `<span class="cost">${x.median ? '≈ ' : ''}${eur(x.cost)}</span>` : '');
+  const krow = (name, v, sub, cost = '', cls = '') => `<div class="krow ${cls}"><span>${esc(name)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="v">${esc(v)}${cost}</span></div>`;
   const group = (title, right, rows) => `<div class="kgroup"><div class="khead"><span>${esc(title)}</span><span>${esc(right)}</span></div>${rows}</div>`;
-  let buy = '', take = '', price = '';
+  const right = (qty, rows) => { const c = sumCost(rows); return c ? `${qty} · ${eur(c)}` : qty; };
+  const lower = (rows) => rows.filter((x) => x.cnt).map((x) => `${x.name.replace(' 4 vrste sira', '').toLowerCase()} ${x.cnt}`).join(' · ');
+  // 1. Za ponijeti
+  const tiles = [];
   if (k.meat) {
+    tiles.push([k.banjice, plural(k.banjice, 'banjica', 'banjice', 'banjica'), 'meso i prilozi']);
+    if (k.lazanjere) tiles.push([k.lazanjere, plural(k.lazanjere, 'lazanjera', 'lazanjere', 'lazanjera'), lower(k.laz)]);
+    tiles.push([k.saladN, plural(k.saladN, 'salata', 'salate', 'salata'), lower(k.salads)]);
+    tiles.push([k.breadN, `${plural(k.breadN, 'krug', 'kruga', 'krugova')} lepinjica`, lower(k.breads)]);
+    if (k.soupL) tiles.push([`${num(k.soupL, 1)} l`, 'juhe', '3 vrste']);
+    if (k.cakes) tiles.push([k.cakes, plural(k.cakes, 'kolač', 'kolača', 'kolača'), 'domaći']);
+  }
+  const takeRows = [];
+  if (k.cutlery) takeRows.push(group('Beštek', `${k.n} ${plural(k.n, 'osoba', 'osobe', 'osoba')}`, ['Tanjuri', 'Vilice', 'Noževi', 'Čaše', 'Salvete'].map((t) => krow(t, String(k.n))).join('')));
+  if (k.tables || k.barTables) takeRows.push(group('Stolovi', '', (k.tables ? krow('Stol + stolnjak', String(k.tables)) : '') + (k.barTables ? krow('Barski stol + presvlaka', String(k.barTables)) : '')));
+  const take = tiles.length || takeRows.length ? `
+    <div class="section-title">Za ponijeti</div>
+    <div class="kcard take">
+      ${tiles.length ? `<div class="tiles">${tiles.map(([n, label, sub]) => `<div class="tile"><b>${esc(n)}</b><span>${esc(label)}</span>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`).join('')}</div>` : ''}
+      ${takeRows.join('')}
+    </div>` : '';
+  // 2. Naplatiti: samo ukupno, stavke na dodir
+  const pay = k.lines.length ? `
+    <div class="section-title">Naplatiti</div>
+    <details class="kcard pay">
+      <summary><span class="big">${eur(k.total)}</span><span class="more">Stavke${ICON.chev}</span></summary>
+      ${k.lines.map(([t, sub, v]) => krow(t, eur(v), sub)).join('')}
+    </details>` : '';
+  // 3. Za kupiti, s cijenama iz Nabavke
+  let buy = '';
+  if (k.meat) {
+    const all = [...k.meat, ...k.sides, ...k.laz, ...k.salads, ...k.breads];
+    const missing = all.filter((x) => x.cost == null).length + (k.soupL ? 1 : 0) + (k.cakes ? 1 : 0);
+    const total = sumCost(all);
+    let note = 'Cijene iz Nabavke (Food), bez PDV-a.';
+    if (!k.priced) note = 'Učitavam cijene iz Nabavke…';
+    else if (!total) note = 'Cijene će se pokazati kad artikle s cijenom dodaš u Nabavku (Food).';
+    else {
+      if (missing) note += ` ${missing} ${plural(missing, 'stavka nema', 'stavke nemaju', 'stavki nema')} cijenu.`;
+      if (k.meat.some((m) => m.median)) note += ` ≈ meso bez svog artikla, po medijanu mesa ${eur(k.med.price)}/kg.`;
+    }
     buy = `<div class="section-title">Za kupiti</div><div class="kcard">
-      ${group('Meso', kgTxt(k.meatG), k.meat.map((m) => (m.pcs ? krow(m.name, `${m.pcs} kom`, `${m.pcs} × ${m.piece} g = ${kgTxt(m.g)}${m.from ? ` ${m.from}` : ''}`) : krow(m.name, kgTxt(m.g)))).join(''))}
-      ${group('Prilozi', kgTxt(k.sideG), [...k.sides.map((s) => krow(s.name, kgTxt(s.g))), ...k.laz.map((s) => krow(s.name, kgTxt(s.g), `${s.cnt} ${plural(s.cnt, 'lazanjera', 'lazanjere', 'lazanjera')}`))].join(''))}
-      ${group('Salate', `${k.saladN} ${plural(k.saladN, 'salata', 'salate', 'salata')}`, k.salads.map((s) => krow(s.name, `× ${s.cnt}`)).join(''))}
-      ${group('Lepinjice', krug(k.breadN), k.breads.map((s) => krow(s.name, krug(s.cnt))).join(''))}
+      ${group('Meso', right(kgTxt(k.meatG), k.meat), k.meat.map((m) => (m.pcs ? krow(m.name, `${m.pcs} kom`, `${m.pcs} × ${m.piece} g = ${kgTxt(m.g)}${m.from ? ` ${m.from}` : ''}`, money(m)) : krow(m.name, kgTxt(m.g), '', money(m)))).join(''))}
+      ${group('Prilozi', right(kgTxt(k.sideG), [...k.sides, ...k.laz]), [...k.sides.map((s) => krow(s.name, kgTxt(s.g), '', money(s))), ...k.laz.map((s) => krow(s.name, kgTxt(s.g), `${s.cnt} ${plural(s.cnt, 'lazanjera', 'lazanjere', 'lazanjera')}`, money(s)))].join(''))}
+      ${group('Salate', right(`${k.saladN} ${plural(k.saladN, 'salata', 'salate', 'salata')}`, k.salads), k.salads.map((s) => krow(s.name, `× ${s.cnt}`, '', money(s))).join(''))}
+      ${group('Lepinjice', right(krug(k.breadN), k.breads), k.breads.map((s) => krow(s.name, krug(s.cnt), `${s.cnt * BREAD_PCS} kom`, money(s))).join(''))}
       ${k.soupL ? group('Predjelo', '', krow(k.P.soup, `${num(k.soupL, 1)} l`, `${num(SOUP_DL, 1)} dl po osobi`)) : ''}
       ${k.cakes ? group('Desert', '', krow(k.P.dessert, `${k.cakes} kom`, `${CAKES} po osobi`)) : ''}
+      ${krow('Ukupno za kupiti', total ? eur(total) : '—', '', '', 'total')}
+      <div class="knote">${esc(note)}</div>
     </div>`;
   }
-  const parts = [];
-  if (k.meat) {
-    parts.push(`<div class="ksum">${[
-      `${k.banjice} ${plural(k.banjice, 'banjica', 'banjice', 'banjica')}`,
-      k.lazanjere && `${k.lazanjere} ${plural(k.lazanjere, 'lazanjera', 'lazanjere', 'lazanjera')}`,
-      `${k.saladN} ${plural(k.saladN, 'salata', 'salate', 'salata')}`,
-      `${krug(k.breadN)} lepinjica${k.breads.length > 1 ? ` (${k.breads.filter((b) => b.cnt).map((b) => `${b.name.toLowerCase()} ${b.cnt}`).join(', ')})` : ''}`,
-      k.soupL && 'juha (3 vrste)',
-      k.cakes && 'domaći kolači',
-    ].filter(Boolean).map(esc).join(' · ')}</div>`);
-  }
-  if (k.cutlery) parts.push(group('Beštek', `${k.n} ${plural(k.n, 'osoba', 'osobe', 'osoba')}`, [['Tanjuri'], ['Vilice'], ['Noževi'], ['Čaše'], ['Salvete']].map(([t]) => krow(t, String(k.n))).join('')));
-  if (k.tables || k.barTables) parts.push(group('Stolovi', '', (k.tables ? krow('Stol + stolnjak', String(k.tables)) : '') + (k.barTables ? krow('Barski stol + presvlaka', String(k.barTables)) : '')));
-  if (parts.length) take = `<div class="section-title">Za ponijeti</div><div class="kcard">${parts.join('')}</div>`;
-  if (k.lines.length) {
-    let note = '';
-    if (k.meat) {
-      note = med
-        ? `<div class="knote">Trošak mesa, procjena: ${kgTxt(k.meatG)} × ${eur(med.price)}/kg = <b>${eur((k.meatG / 1000) * med.price)}</b> (medijan cijena mesa iz Nabavke, bez PDV-a)</div>`
-        : '<div class="knote">Za procjenu troška mesa dodaj meso s cijenom po kg u Nabavku.</div>';
-    }
-    price = `<div class="section-title">Cijena</div><div class="kcard">
-      ${k.lines.map(([t, sub, v]) => krow(t, eur(v), sub)).join('')}
-      ${krow('Ukupno', eur(k.total), '', 'total')}${note}
-    </div>`;
-  }
-  return priceFirst ? price + take + buy : buy + take + price;
+  return take + pay + buy;
 }
 
 function dayCard(date, events, past) {
@@ -315,12 +392,11 @@ function dayCard(date, events, past) {
           <span class="body">
             <span class="title one" style="display:block">${esc(c.title || 'Catering')}</span>
             <span class="meta">
-              ${c.event_time ? `<span>${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
-              ${c.people ? `<span>${ICON.people}${c.people}</span>` : ''}
+              <span>${ICON.people}${c.people ?? '–'}</span>
+              <span class="${c.event_time ? '' : 'unset'}">${ICON.clock}${c.event_time ? fmtTime(c.event_time) : '--:--'}</span>
               ${c.package ? `<span class="ptag">${n >= 3 ? 'P' : 'Paket '}${c.package}</span>` : ''}
-              ${n >= 3 && c.location ? `<span class="one" style="display:block">${esc(c.location)}</span>` : ''}
             </span>
-            ${n < 3 && c.location ? `<span class="loc">${ICON.pin}<span class="one">${esc(c.location)}</span></span>` : ''}
+            ${c.location ? `<span class="loc">${ICON.pin}<span class="one">${esc(c.location)}</span></span>` : ''}
           </span>
           <span class="chev">${ICON.chev}</span>
         </button>`).join('')}
@@ -367,15 +443,22 @@ async function renderCateringList() {
   } catch (e) { failed('Catering', '/', e); }
 }
 
-const loadItems = () => sb.from('items').select('name, unit, price_net').then((r) => r.data || [], () => []);
+const loadItems = () => sb.from('items').select('name, unit, price_net, category, updated_at').then((r) => r.data || [], () => []);
+// broj mobitela u kontaktu postaje poveznica za poziv
+const telLink = (s) => esc(s).replace(/\+?\d[\d\s/-]{5,}\d/g, (m) => `<a href="tel:${m.replace(/[^\d+]/g, '')}">${m}</a>`);
 
 async function renderCateringDetail(id) {
   loading('Catering', '/catering');
   try {
     const [c, items] = await Promise.all([q(sb.from('caterings').select('*').eq('id', id).single()), loadItems()]);
     const d = parseDate(c.event_date);
-    const item = (label, v) => (v ? `<div class="item"><div class="label">${label}</div><div class="value">${esc(v)}</div></div>` : '');
-    const hasDetails = c.location || c.contact || c.description || c.platters || c.extras;
+    const info = [
+      c.location && [ICON.pin, 'Lokacija', esc(c.location)],
+      c.contact && [ICON.phone, 'Kontakt', telLink(c.contact)],
+      c.description && [ICON.note, 'Opis i napomene', esc(c.description)],
+      c.platters && [ICON.note, 'Banjice', esc(c.platters)],
+      c.extras && [ICON.note, 'Dodatno', esc(c.extras)],
+    ].filter(Boolean);
     screen({
       title: c.title || 'Catering', back: '/catering',
       body: `
@@ -387,15 +470,9 @@ async function renderCateringDetail(id) {
             ${c.event_time ? `<span class="chip">${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
             ${c.people ? `<span class="chip">${ICON.people}${c.people} ${plural(c.people, 'osoba', 'osobe', 'osoba')}</span>` : ''}
           </div>
+          ${info.length ? `<div class="hinfo">${info.map(([ic, label, v]) => `<div class="hrow">${ic}<div class="hv"><div class="label">${label}</div><div class="value">${v}</div></div></div>`).join('')}</div>` : ''}
         </div>
-        ${hasDetails ? `<div class="detail">
-          ${item('Lokacija', c.location)}
-          ${item('Kontakt', c.contact)}
-          ${item('Opis i napomene', c.description)}
-          ${item('Banjice', c.platters)}
-          ${item('Dodatno', c.extras)}
-        </div>` : ''}
-        ${calcView(cateringCalc(c), meatMedian(items))}
+        ${calcView(costCalc(cateringCalc(c), items))}
         <div class="actions">
           <button class="btn secondary tap" data-go="/catering/${c.id}/edit">Uredi</button>
           <button class="btn danger" id="del">Obriši catering</button>
@@ -458,7 +535,7 @@ async function renderCateringForm(id) {
       </form>`,
   });
   const f = document.getElementById('f');
-  let med = null;
+  let items = null;
   const state = () => ({
     package: Number(f.elements.package.value) || null, people: numVal(f, 'people'), cutlery: f.elements.cutlery.checked,
     tables: Number(f.elements.tables.value) || 0, bar_tables: Number(f.elements.bar_tables.value) || 0,
@@ -466,8 +543,8 @@ async function renderCateringForm(id) {
   const redraw = () => {
     const s = state();
     const box = document.getElementById('calc');
-    if (s.package && !s.people) { box.innerHTML = '<p class="muted small center">Upiši broj ljudi i odmah vidiš što treba kupiti.</p>'; return; }
-    box.innerHTML = calcView(cateringCalc(s), med, true);
+    if (s.package && !s.people) { box.innerHTML = '<p class="muted small center">Upiši broj ljudi i odmah vidiš što treba ponijeti i kupiti.</p>'; return; }
+    box.innerHTML = calcView(costCalc(cateringCalc(s), items));
   };
   f.addEventListener('click', (e) => {
     const p = e.target.closest('[data-pkg]');
@@ -489,7 +566,7 @@ async function renderCateringForm(id) {
   f.people.addEventListener('input', redraw);
   f.cutlery.addEventListener('change', redraw);
   redraw();
-  loadItems().then((items) => { med = meatMedian(items); if (document.getElementById('calc')) redraw(); });
+  loadItems().then((r) => { items = r; if (document.getElementById('calc')) redraw(); });
   f.onsubmit = async (e) => {
     e.preventDefault();
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
@@ -515,31 +592,58 @@ function renderRestoranMenu() {
     body: `<div class="menu">
       ${menuBtn('/jelovnik', 'book', 'green', 'Jelovnik', 'Normativi, recepti, food cost')}
       ${menuBtn('/dostava', 'bike', 'gold', 'Jelovnik - Dostava', 'Cijene za Wolt i sl.')}
-      ${menuBtn('/nabavka', 'cart', 'green', 'Nabavka', 'Dobavljači, artikli, cijene')}
+      ${menuBtn('/normativ', 'scale', 'green', 'Normativ', 'Sastojci i food cost svih jela')}
+      ${menuBtn('/nabavka', 'cart', 'gold', 'Nabavka', 'Food, Drink, Chemical')}
     </div>`,
   });
 }
 
-/* ---------- NABAVKA ---------- */
-async function renderSuppliers() {
+/* ---------- NABAVKA: Food / Drink / Chemical, pa dobavljači i artikli ---------- */
+const NCATS = {
+  food: { name: 'Food', sub: 'Hrana', icon: 'utensils', color: 'green' },
+  drink: { name: 'Drink', sub: 'Pića', icon: 'cup', color: 'gold' },
+  chemical: { name: 'Chemical', sub: 'Kemija i potrošni', icon: 'spray', color: 'blue' },
+};
+const catChips = (type, name, selected) => Object.entries(NCATS).map(([k, c]) => `<label class="catchip"><input type="${type}" name="${name}" value="${k}" ${selected.includes(k) ? 'checked' : ''}><span>${c.name}</span></label>`).join('');
+const pickLabel = (t) => `<div style="font-size:13px;font-weight:600;color:var(--muted);padding-left:4px;margin-bottom:8px">${t}</div>`;
+
+async function renderNabavka() {
   loading('Nabavka', '/restoran');
   try {
-    const rows = await q(sb.from('suppliers').select('id, name, items(count)').order('name'));
+    const [sups, items] = await Promise.all([q(sb.from('suppliers').select('id, categories')), q(sb.from('items').select('category'))]);
+    const sub = (k) => {
+      const s = sups.filter((x) => (x.categories || []).includes(k)).length;
+      const i = items.filter((x) => x.category === k).length;
+      return `${NCATS[k].sub} · ${s} ${plural(s, 'dobavljač', 'dobavljača', 'dobavljača')} · ${i} ${plural(i, 'artikl', 'artikla', 'artikala')}`;
+    };
     screen({
       title: 'Nabavka', back: '/restoran', action: '/dobavljac/new',
       body: `
+        <div class="menu">${Object.entries(NCATS).map(([k, c]) => menuBtn(`/nabavka/${k}`, c.icon, c.color, c.name, sub(k))).join('')}</div>
+        <div class="actions"><button class="btn secondary tap" data-go="/artikli">Svi artikli i cijene</button></div>`,
+    });
+  } catch (e) { failed('Nabavka', '/restoran', e); }
+}
+
+async function renderNabCategory(cat) {
+  const C = NCATS[cat];
+  loading(C.name, '/nabavka');
+  try {
+    const rows = await q(sb.from('suppliers').select('id, name, items(category)').contains('categories', [cat]).order('name'));
+    screen({
+      title: C.name, back: '/nabavka', action: `/dobavljac/new?c=${cat}`,
+      body: `
         <div class="section-title">Dobavljači</div>
         ${rows.length ? `<div class="group">${rows.map((s) => {
-          const n = s.items[0]?.count || 0;
-          return `<button class="cell" data-go="/nabavka/${s.id}">
+          const n = (s.items || []).filter((i) => i.category === cat).length;
+          return `<button class="cell" data-go="/nabavka/${cat}/${s.id}">
             <span class="main"><span class="title one" style="display:block">${esc(s.name)}</span></span>
             <span class="muted nowrap">${n} ${plural(n, 'artikl', 'artikla', 'artikala')}</span>
             <span class="chev">${ICON.chev}</span>
           </button>`;
-        }).join('')}</div>` : '<div class="empty">Nema dobavljača. Dodaj na +</div>'}
-        <div class="actions"><button class="btn secondary tap" data-go="/artikli">Svi artikli i cijene</button></div>`,
+        }).join('')}</div>` : `<div class="empty">Nema dobavljača u ${C.name}.<br>Dodaj na + ili u dobavljaču označi ${C.name}.</div>`}`,
     });
-  } catch (e) { failed('Nabavka', '/restoran', e); }
+  } catch (e) { failed(C.name, '/nabavka', e); }
 }
 
 function itemCell(i, showSupplier) {
@@ -548,28 +652,29 @@ function itemCell(i, showSupplier) {
     <button class="cell" data-go="/artikl/${i.id}">
       <span class="main">
         <span class="price-row"><span class="title one">${esc(i.name)}</span><span class="p">${eur(i.price_net)}<span class="muted" style="font-weight:400">/${esc(i.unit)}</span></span></span>
-        <span class="meta price-row"><span class="one">${showSupplier ? esc(i.suppliers?.name) + ' · ' : ''}s PDV-om ${eur(gross)}</span><span class="nowrap">${fmtStamp(i.updated_at)}</span></span>
+        <span class="meta price-row"><span class="one">${showSupplier ? `${NCATS[i.category]?.name || ''} · ${esc(i.suppliers?.name)} · ` : ''}s PDV-om ${eur(gross)}</span><span class="nowrap">${fmtStamp(i.updated_at)}</span></span>
       </span>
     </button>`;
 }
 
-async function renderSupplier(id) {
-  loading('Dobavljač', '/nabavka');
+async function renderSupplier(id, cat) {
+  const back = cat ? `/nabavka/${cat}` : '/nabavka';
+  loading('Dobavljač', back);
   try {
     const s = await q(sb.from('suppliers').select('*, items(*)').eq('id', id).single());
-    const items = (s.items || []).sort((a, b) => a.name.localeCompare(b.name, 'hr'));
+    const items = (s.items || []).filter((i) => !cat || i.category === cat).sort((a, b) => a.name.localeCompare(b.name, 'hr'));
     screen({
-      title: s.name, back: '/nabavka', action: `/artikl/new?s=${s.id}`,
+      title: s.name, back, action: `/artikl/new?s=${s.id}${cat ? `&c=${cat}` : ''}`,
       body: `
         ${s.contact || s.note ? `<div class="detail" style="margin-bottom:6px">
           ${s.contact ? `<div class="item"><div class="label">Kontakt</div><div class="value">${esc(s.contact)}</div></div>` : ''}
           ${s.note ? `<div class="item"><div class="label">Napomena</div><div class="value">${esc(s.note)}</div></div>` : ''}
         </div>` : ''}
-        <div class="section-title">Artikli · cijene bez PDV-a</div>
+        <div class="section-title">${cat ? `${NCATS[cat].name} · ` : ''}Artikli · cijene bez PDV-a</div>
         ${items.length ? `<div class="group">${items.map((i) => itemCell(i)).join('')}</div>` : '<div class="empty">Nema artikala. Dodaj na +</div>'}
-        <div class="actions"><button class="btn secondary tap" data-go="/dobavljac/${s.id}/edit">Uredi dobavljača</button></div>`,
+        <div class="actions"><button class="btn secondary tap" data-go="/dobavljac/${s.id}/edit${cat ? `?c=${cat}` : ''}">Uredi dobavljača</button></div>`,
     });
-  } catch (e) { failed('Dobavljač', '/nabavka', e); }
+  } catch (e) { failed('Dobavljač', back, e); }
 }
 
 async function renderAllItems() {
@@ -587,15 +692,16 @@ async function renderAllItems() {
   } catch (e) { failed('Svi artikli', '/nabavka', e); }
 }
 
-async function renderSupplierForm(id) {
-  let s = {};
+async function renderSupplierForm(id, cat) {
+  let s = { categories: [cat || 'food'] };
   if (id) { try { s = await q(sb.from('suppliers').select('*').eq('id', id).single()); } catch (e) { toast(errText(e)); } }
-  const back = id ? `/nabavka/${id}` : '/nabavka';
+  const back = id ? (cat ? `/nabavka/${cat}/${id}` : `/nabavka/${id}`) : (cat ? `/nabavka/${cat}` : '/nabavka');
   screen({
     title: id ? 'Uredi dobavljača' : 'Novi dobavljač', back,
     body: `
       <form id="f">
         <label>Naziv<input name="name" value="${esc(s.name)}" required></label>
+        <div>${pickLabel('Gdje se prikazuje (može više)')}<div class="catpick">${catChips('checkbox', 'categories', s.categories || [])}</div></div>
         <label>Kontakt<input name="contact" value="${esc(s.contact)}" placeholder="osoba, mobitel, e-mail"></label>
         <label>Napomena<textarea name="note">${esc(s.note)}</textarea></label>
         <div class="err" id="err"></div>
@@ -606,10 +712,13 @@ async function renderSupplierForm(id) {
   const f = document.getElementById('f');
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const row = { name: val(f, 'name'), contact: val(f, 'contact'), note: val(f, 'note') };
+    const categories = [...f.querySelectorAll('input[name=categories]:checked')].map((x) => x.value);
+    if (!categories.length) { document.getElementById('err').textContent = 'Označi barem jedno: Food, Drink ili Chemical.'; return; }
+    const row = { name: val(f, 'name'), contact: val(f, 'contact'), note: val(f, 'note'), categories };
+    const to = (sid) => `/nabavka/${categories.includes(cat) ? cat : categories[0]}/${sid}`;
     try {
-      if (id) { await q(sb.from('suppliers').update(row).eq('id', id)); go(`/nabavka/${id}`); }
-      else { const r = await q(sb.from('suppliers').insert(row).select('id').single()); go(`/nabavka/${r.id}`); }
+      if (id) { await q(sb.from('suppliers').update(row).eq('id', id)); go(to(id)); }
+      else { const r = await q(sb.from('suppliers').insert(row).select('id').single()); go(to(r.id)); }
       toast('Spremljeno');
     } catch (err) { document.getElementById('err').textContent = errText(err); }
   };
@@ -623,20 +732,22 @@ async function renderSupplierForm(id) {
 const UNITS = ['kg', 'g', 'l', 'ml', 'kom', 'pak'];
 const unitOptions = (sel) => UNITS.map((u) => `<option ${u === sel ? 'selected' : ''}>${u}</option>`).join('');
 
-async function renderItemForm(id, supplierId) {
-  let i = { unit: 'kg', vat_rate: 25, supplier_id: supplierId };
+async function renderItemForm(id, supplierId, cat) {
+  let i = { unit: 'kg', vat_rate: 25, supplier_id: supplierId, category: cat };
   let suppliers = [];
   try {
-    suppliers = await q(sb.from('suppliers').select('id, name').order('name'));
+    suppliers = await q(sb.from('suppliers').select('id, name, categories').order('name'));
     if (id) i = await q(sb.from('items').select('*').eq('id', id).single());
   } catch (e) { toast(errText(e)); }
-  const back = i.supplier_id ? `/nabavka/${i.supplier_id}` : '/nabavka';
+  if (!NCATS[i.category]) i.category = suppliers.find((s) => s.id === i.supplier_id)?.categories?.[0] || 'food';
+  const back = i.supplier_id ? `/nabavka/${i.category}/${i.supplier_id}` : '/nabavka';
   screen({
     title: id ? 'Uredi artikl' : 'Novi artikl', back,
     body: `
       <form id="f">
         <label>Naziv artikla<input name="name" value="${esc(i.name)}" required placeholder="npr. Svinjski vrat"></label>
         <label>Dobavljač<select name="supplier_id" required>${suppliers.map((s) => `<option value="${s.id}" ${s.id === i.supplier_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+        <div>${pickLabel('Kategorija')}<div class="catpick">${catChips('radio', 'category', [i.category])}</div></div>
         <div class="grid2">
           <label>Cijena bez PDV-a (€)<input name="price_net" inputmode="decimal" value="${esc(i.price_net)}" placeholder="0,00"></label>
           <label>Po jedinici<select name="unit">${unitOptions(i.unit)}</select></label>
@@ -651,12 +762,15 @@ async function renderItemForm(id, supplierId) {
   const f = document.getElementById('f');
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const row = { name: val(f, 'name'), supplier_id: val(f, 'supplier_id'), price_net: numVal(f, 'price_net'), unit: val(f, 'unit'), vat_rate: numVal(f, 'vat_rate') };
+    const row = { name: val(f, 'name'), supplier_id: val(f, 'supplier_id'), category: f.elements.category.value || 'food', price_net: numVal(f, 'price_net'), unit: val(f, 'unit'), vat_rate: numVal(f, 'vat_rate') };
     if (row.price_net != null && isNaN(row.price_net)) { document.getElementById('err').textContent = 'Cijena nije broj.'; return; }
     try {
       if (id) await q(sb.from('items').update(row).eq('id', id));
       else await q(sb.from('items').insert(row));
-      toast('Spremljeno'); go(`/nabavka/${row.supplier_id}`);
+      // dobavljač se mora prikazivati u kategoriji svog artikla
+      const sup = suppliers.find((s) => s.id === row.supplier_id);
+      if (sup && !(sup.categories || []).includes(row.category)) await q(sb.from('suppliers').update({ categories: [...(sup.categories || []), row.category] }).eq('id', sup.id));
+      toast('Spremljeno'); go(`/nabavka/${row.category}/${row.supplier_id}`);
     } catch (err) { document.getElementById('err').textContent = errText(err); }
   };
   const del = document.getElementById('del');
@@ -716,15 +830,16 @@ async function renderMenuList(delivery) {
   } catch (e) { failed(title, '/restoran', e); }
 }
 
-async function renderDish(id) {
-  loading('Jelo', '/jelovnik');
+async function renderDish(id, from) {
+  const back = from === 'n' ? '/normativ' : '/jelovnik';
+  loading('Jelo', back);
   try {
     const d = await q(sb.from('dishes').select('*, dish_ingredients(*, items(name, price_net, unit, suppliers(name)))').eq('id', id).single());
     const ings = (d.dish_ingredients || []).sort((a, b) => a.sort - b.sort);
     const { cost, missing } = dishCost(d);
     const priceLine = (label, p) => `<div class="price-row" style="margin-top:6px"><span>${label}</span><span class="p">${eur(p)} ${factorBadge(p, d.vat_rate, cost)}</span></div>`;
     screen({
-      title: d.name, back: '/jelovnik',
+      title: d.name, back,
       body: `
         <div class="hero">
           <div class="muted small">${esc(d.category || 'Bez kategorije')} · PDV ${num(d.vat_rate ?? 0, 1)}%</div>
@@ -744,7 +859,49 @@ async function renderDish(id) {
         <div class="detail"><div class="item"><div class="value">${d.recipe ? esc(d.recipe) : '<span class="muted">Recept nije upisan.</span>'}</div></div></div>
         <div class="actions"><button class="btn secondary tap" data-go="/jelo/${d.id}/edit">Uredi jelo, normativ i recept</button></div>`,
     });
-  } catch (e) { failed('Jelo', '/jelovnik', e); }
+  } catch (e) { failed('Jelo', back, e); }
+}
+
+async function renderNormativ() {
+  loading('Normativ', '/restoran');
+  try {
+    const rows = await q(sb.from('dishes').select('id, name, category, dish_ingredients(name, qty, unit, sort, items(price_net, unit))').order('sort').order('name'));
+    if (!rows.length) {
+      screen({ title: 'Normativ', back: '/restoran', body: '<div class="empty">Još nema jela.<br>Normativ se upisuje uz svako jelo u Jelovniku.</div><div class="actions"><button class="btn secondary tap" data-go="/jelovnik">Otvori Jelovnik</button></div>' });
+      return;
+    }
+    const without = rows.filter((d) => !(d.dish_ingredients || []).length).length;
+    screen({
+      title: 'Normativ', back: '/restoran',
+      body: `
+        <input id="s" type="search" placeholder="Traži jelo ili sastojak…" style="margin-bottom:8px">
+        <p class="muted small" style="margin:0 4px 12px">${rows.length} jela · ${without ? `${without} bez normativa` : 'sva imaju normativ'} · food cost za 1 porciju</p>
+        <div id="l"></div>`,
+    });
+    const l = document.getElementById('l');
+    const draw = (t) => {
+      const n = norm(t);
+      const list = rows.filter((d) => !n || norm(d.name).includes(n) || (d.dish_ingredients || []).some((g) => norm(g.name).includes(n)));
+      const groups = {};
+      list.forEach((d) => { (groups[d.category || 'Ostalo'] ||= []).push(d); });
+      l.innerHTML = list.length ? Object.entries(groups).map(([cat, ds]) => `
+        <div class="section-title">${esc(cat)}</div>
+        <div class="group">${ds.map((d) => {
+          const ings = (d.dish_ingredients || []).sort((a, b) => a.sort - b.sort);
+          const { cost, missing } = dishCost(d);
+          return `
+          <button class="cell" data-go="/jelo/${d.id}?b=n">
+            <span class="main">
+              <span class="price-row"><span class="title one">${esc(d.name)}</span><span class="p">${cost != null ? eur(cost) : ''}</span></span>
+              <span class="meta">${ings.length ? ings.map((g) => `${esc(g.name)} ${num(g.qty, 3)} ${esc(g.unit)}`).join(' · ') + (missing ? ` · <span class="overdue">${missing} bez cijene</span>` : '') : '<span class="overdue">Normativ nije upisan</span>'}</span>
+            </span>
+            <span class="chev">${ICON.chev}</span>
+          </button>`;
+        }).join('')}</div>`).join('') : '<div class="empty" style="margin-top:14px">Ništa nije pronađeno.</div>';
+    };
+    document.getElementById('s').oninput = (e) => draw(e.target.value);
+    draw('');
+  } catch (e) { failed('Normativ', '/restoran', e); }
 }
 
 async function renderDishForm(id) {
@@ -1278,14 +1435,18 @@ async function route() {
     case 'restoran': return renderRestoranMenu();
     case 'jelovnik': return p[1] === 'skeniraj' ? renderScanMenu() : renderMenuList(false);
     case 'dostava': return renderMenuList(true);
-    case 'nabavka': return p[1] ? renderSupplier(p[1]) : renderSuppliers();
+    case 'normativ': return renderNormativ();
+    case 'nabavka':
+      if (!p[1]) return renderNabavka();
+      if (!NCATS[p[1]]) return renderSupplier(p[1]); // stara poveznica bez kategorije
+      return p[2] ? renderSupplier(p[2], p[1]) : renderNabCategory(p[1]);
     case 'artikli': return renderAllItems();
-    case 'dobavljac': return p[1] === 'new' ? renderSupplierForm() : renderSupplierForm(p[1]);
-    case 'artikl': return p[1] === 'new' ? renderItemForm(null, params.get('s')) : renderItemForm(p[1]);
+    case 'dobavljac': return renderSupplierForm(p[1] === 'new' ? null : p[1], NCATS[params.get('c')] ? params.get('c') : null);
+    case 'artikl': return p[1] === 'new' ? renderItemForm(null, params.get('s'), NCATS[params.get('c')] ? params.get('c') : null) : renderItemForm(p[1]);
     case 'jelo':
       if (p[1] === 'new') return renderDishForm();
       if (p[2] === 'edit') return renderDishForm(p[1]);
-      return renderDish(p[1]);
+      return renderDish(p[1], params.get('b'));
     case 'todo': return p[1] === 'new' ? renderTaskForm() : renderTodo();
     case 'admin': return renderAdmin();
     case 'radnje': return renderActivity();

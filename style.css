@@ -92,6 +92,7 @@ main { padding: 0 16px 16px; }
 .menu .ico svg { width: 24px; height: 24px; }
 .menu .ico.green { background: var(--accent); color: var(--accent-ink); }
 .menu .ico.gold { background: var(--gold); color: #fff; }
+.menu .ico.blue { background: #3a78c2; color: #fff; }
 .menu .txt { flex: 1; min-width: 0; }
 .menu .name { display: block; font-size: 19px; font-weight: 700; }
 .menu .sub { display: block; font-size: 14px; color: var(--muted); margin-top: 2px; }
@@ -148,9 +149,11 @@ main { padding: 0 16px 16px; }
 .ev .meta span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .ev .loc { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 14px; color: var(--ink); min-width: 0; }
 .ev svg { width: 15px; height: 15px; flex: none; }
+.ev .meta .unset { opacity: .6; }
 .day.compact .ev { padding: 9px 12px; }
 .day.compact .ev .title { font-size: 15px; }
 .day.compact .ev .meta { margin-top: 2px; font-size: 13px; }
+.day.compact .ev .loc { margin-top: 1px; font-size: 13px; }
 .day.past .date { background: var(--fill); color: var(--muted); }
 .ptag { padding: 1px 7px; border-radius: 6px; background: var(--gold-soft); color: var(--gold); font-weight: 700; font-size: 12px; }
 
@@ -321,9 +324,37 @@ input[type=checkbox].sw:checked::before { transform: translateX(20px); }
 .krow .sub { display: block; font-size: 13px; color: var(--muted); }
 .krow.total { border-top: 2px solid var(--line); padding: 11px 0; font-size: 18px; font-weight: 800; }
 .kgroup:last-child, .krow:last-child { padding-bottom: 10px; }
-.ksum { padding: 13px 0; font-size: 17px; font-weight: 700; line-height: 1.45; }
-.ksum + .kgroup { border-top: 1px solid var(--line); }
 .knote { padding: 2px 0 12px; font-size: 13px; color: var(--muted); }
 .chip.gold { background: var(--gold-soft); color: var(--gold); }
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type=number] { -moz-appearance: textfield; }
+
+/* Catering detalji: lokacija, kontakt i napomene u gornjoj kartici */
+.hinfo { margin-top: 14px; border-top: 1px solid var(--line); }
+.hrow { display: flex; gap: 12px; padding-top: 12px; }
+.hrow > svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+.hrow .hv { flex: 1; min-width: 0; }
+.hrow .label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.hrow .value { margin-top: 1px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hrow a { color: var(--accent); font-weight: 600; text-decoration: none; }
+
+/* Za ponijeti: istaknuta tamnozelena kartica */
+.kcard.take { background: linear-gradient(145deg, #1f5c45, #123a2b); color: #fff; padding: 4px 14px 6px; box-shadow: 0 6px 18px rgba(18, 58, 43, .25); }
+.take .tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 10px 0; }
+.take .tile { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .09); min-width: 0; }
+.take .tile b { display: block; font-size: 28px; font-weight: 800; line-height: 1.05; color: #e9c27a; letter-spacing: -.5px; }
+.take .tile span { display: block; margin-top: 2px; font-size: 15px; font-weight: 700; }
+.take .tile small { display: block; margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, .72); overflow-wrap: anywhere; }
+.take .khead { color: #e9c27a; }
+.take .krow + .krow { border-top-color: rgba(255, 255, 255, .14); }
+.take .tiles + .kgroup, .take .kgroup + .kgroup { border-top: 1px solid rgba(255, 255, 255, .14); }
+
+/* Naplatiti: samo ukupno, stavke na dodir */
+.kcard.pay summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; cursor: pointer; list-style: none; }
+.kcard.pay summary::-webkit-details-marker { display: none; }
+.kcard.pay .big { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+.kcard.pay .more { display: inline-flex; align-items: center; gap: 2px; color: var(--accent); font-size: 14px; font-weight: 600; }
+.kcard.pay .more svg { width: 16px; height: 16px; transition: transform .2s; }
+.kcard.pay[open] .more svg { transform: rotate(90deg); }
+.kcard.pay[open] summary { border-bottom: 1px solid var(--line); }
+.krow .v .cost { display: block; margin-top: 1px; font-size: 13px; font-weight: 500; color: var(--muted); }
