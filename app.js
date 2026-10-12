@@ -9,6 +9,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let me = null; // { id, username, full_name, role }
+let pendingGo = null; // odredište (hash) iz push obavijesti dok korisnik još nije prijavljen
 const app = document.getElementById('app');
 
 /* ---------- pomoćne funkcije ---------- */
@@ -70,11 +71,15 @@ function errText(e) {
   if (/Invalid login credentials/i.test(m)) return 'Pogrešno korisničko ime ili PIN.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Nema veze s internetom.';
   if (/duplicate key/i.test(m)) return 'Taj naziv već postoji.';
+  if (/JSON object requested|0 rows|Cannot coerce the result/i.test(m)) return 'Zapis više ne postoji (možda je obrisan).';
   return m;
 }
 async function q(promise) {
+  const write = !!promise.method && promise.method !== 'GET' && promise.method !== 'HEAD';
+  if (write) liveMute = Date.now() + 2000; // jeka vlastitog upisa iz Realtimea ne treba ponovni dohvat
   const { data, error } = await promise;
   if (error) throw error;
+  if (write) liveMute = Date.now() + 2000;
   return data;
 }
 
@@ -89,9 +94,11 @@ function screen({ title, back, action, right = '', body, hideTitle }) {
     ${hideTitle ? '' : `<h1 class="large">${esc(title)}</h1>`}
     <main>${body}</main>`;
   document.title = title ? `${title} · Polaris` : 'Polaris';
-  window.scrollTo(0, 0);
+  if (!liveSilent) window.scrollTo(0, 0);
 }
-function loading(title, back) { screen({ title, back, body: '<p class="muted center">Učitavam…</p>' }); }
+let renderSeq = 0; // utrka rendera: stariji odgovor ne smije prepisati noviji prikaz
+function loading(title, back) { if (!liveSilent) screen({ title, back, body: '<p class="muted center">Učitavam…</p>' }); return ++renderSeq; }
+const stale = (my) => my !== renderSeq;
 function failed(title, back, e) { screen({ title, back, body: `<p class="err">${esc(errText(e))}</p>` }); }
 
 const menuBtn = (path, icon, color, name, sub) => `
@@ -130,7 +137,7 @@ function renderLogin() {
     if (error) { document.getElementById('err').textContent = errText(error); btn.disabled = false; return; }
     await loadMe();
     if (!me) { document.getElementById('err').textContent = 'Račun nije aktivan.'; await sb.auth.signOut(); btn.disabled = false; return; }
-    location.hash = '#/'; route(); flushPush();
+    location.hash = pendingGo || '#/'; pendingGo = null; route(); flushPush();
   };
 }
 
@@ -151,6 +158,7 @@ async function logout() {
 const PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const pushDeniedText = () => (isIOS && isStandalone() ? 'Obavijesti su isključene za Polaris. Uključi ih u iOS Postavke → Obavijesti → Polaris.' : 'Obavijesti su blokirane u postavkama preglednika za ovu aplikaciju.');
 const swReady = () => Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(() => r(null), 4000))]);
 async function pushSubscription() {
   if (!PUSH_OK) return null;
@@ -168,13 +176,17 @@ async function pushRegistered() {
 }
 async function enablePush() {
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Obavijesti su blokirane u postavkama preglednika za ovu aplikaciju.' : 'Obavijesti nisu dopuštene.');
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? pushDeniedText() : 'Obavijesti nisu dopuštene.');
   const reg = await swReady();
   if (!reg) throw new Error('Aplikacija još nije spremna, pokušaj ponovno za koji trenutak.');
   const { data, error } = await sb.functions.invoke('push-send', { body: { action: 'key' } });
   if (error || !data?.key) throw new Error('Ne mogu dohvatiti ključ za obavijesti.');
+  const key = b64ToBytes(data.key);
   let sub = await reg.pushManager.getSubscription();
-  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.key) });
+  // pretplata vezana uz drugi (stari) ključ servera je mrtva: napravi novu
+  const cur = sub?.options?.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null;
+  if (sub && cur && (cur.length !== key.length || cur.some((b, i) => b !== key[i]))) { await sub.unsubscribe(); sub = null; }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   const j = sub.toJSON();
   await q(sb.rpc('register_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_user_agent: navigator.userAgent }));
 }
@@ -186,14 +198,27 @@ async function disablePush() {
 }
 // kartica "Uključi obavijesti" na početnom ekranu (dok uređaj nije registriran)
 async function pushAskCard() {
-  if (!document.getElementById('pushask') || !PUSH_OK || Notification.permission === 'denied' || pushLater.get()) return;
-  if (await pushRegistered()) return;
+  if (!document.getElementById('pushask') || pushLater.get()) return;
+  if (!PUSH_OK) {
+    // iPhone u Safariju: obavijesti rade tek s početnog zaslona
+    if (!isIOS || isStandalone()) return;
+    const el0 = document.getElementById('pushask');
+    el0.innerHTML = `
+    <div class="kcard pushask">
+      <span class="ico">${ICON.bell}</span>
+      <span class="txt"><b>Dodaj Polaris na početni zaslon</b><span>Safari → Dijeli → Dodaj na početni zaslon. Tako radi kao aplikacija i prima obavijesti.</span></span>
+      <button class="link" id="pushlater">Kasnije</button>
+    </div>`;
+    document.getElementById('pushlater').onclick = () => { pushLater.set(); el0.innerHTML = ''; };
+    return;
+  }
+  if (Notification.permission === 'denied' || await pushRegistered()) return;
   const el = document.getElementById('pushask');
   if (!el) return;
   el.innerHTML = `
     <div class="kcard pushask">
       <span class="ico">${ICON.bell}</span>
-      <span class="txt"><b>Uključi obavijesti</b><span>Zadaci${isAdmin() ? ', novi domjenci i eventi' : ''} stižu na ovaj uređaj.</span></span>
+      <span class="txt"><b>Uključi obavijesti</b><span>Zadaci${isAdmin() ? ', novi catering ili event' : ''} stižu na ovaj uređaj.</span></span>
       <button class="btn tap" id="pushon">Uključi</button>
       <button class="link" id="pushlater">Kasnije</button>
     </div>`;
@@ -204,15 +229,16 @@ async function pushAskCard() {
   document.getElementById('pushlater').onclick = () => { pushLater.set(); el.innerHTML = ''; };
 }
 async function renderNotifications() {
-  loading('Obavijesti', '/');
+  const my = loading('Obavijesti', '/');
   let rows;
-  try { rows = await q(sb.from('notifications').select('id, title, body, url, created_at, read_at').eq('user_id', me.id).order('created_at', { ascending: false }).limit(30)); } catch (e) { return failed('Obavijesti', '/', e); }
+  try { rows = await q(sb.from('notifications').select('id, title, body, url, created_at, read_at').eq('user_id', me.id).order('created_at', { ascending: false }).limit(30)); } catch (e) { if (!stale(my)) failed('Obavijesti', '/', e); return; }
   const on = PUSH_OK && Notification.permission === 'granted' && await pushRegistered();
+  if (stale(my)) return;
   let status, hint = '';
   if (!PUSH_OK) {
     if (isIOS && !isStandalone()) { status = 'Na iPhoneu obavijesti rade tek kad je aplikacija na početnom zaslonu.'; hint = 'Safari → Dijeli → Dodaj na početni zaslon, zatim otvori Polaris s početnog zaslona i ovdje uključi obavijesti.'; }
     else status = 'Ovaj preglednik ne podržava obavijesti.';
-  } else if (Notification.permission === 'denied') status = 'Obavijesti su blokirane u postavkama preglednika za ovu aplikaciju.';
+  } else if (Notification.permission === 'denied') status = pushDeniedText();
   else status = on ? 'Uključene na ovom uređaju' : 'Isključene na ovom uređaju';
   const canToggle = PUSH_OK && Notification.permission !== 'denied';
   screen({
@@ -226,8 +252,8 @@ async function renderNotifications() {
       </div>
       <div class="section-title">Zadnje obavijesti</div>
       ${rows.length ? `<div class="group">${rows.map((n) => `
-        <button class="cell" data-go="${esc((n.url || '#/').replace(/^#/, ''))}">
-          <span class="main"><span class="title one" style="display:block;${n.read_at ? 'font-weight:500' : ''}">${esc(n.title)}</span>${n.body ? `<span class="meta" style="display:block">${esc(n.body)}</span>` : ''}<span class="meta" style="display:block">${fmtStamp(n.created_at)}</span></span>
+        <button class="cell${n.read_at ? '' : ' unread'}" data-go="${esc((n.url || '#/').replace(/^#/, ''))}">
+          <span class="main"><span class="title one" style="display:block">${esc(n.title)}</span>${n.body ? `<span class="meta" style="display:block">${esc(n.body)}</span>` : ''}<span class="meta" style="display:block">${fmtStamp(n.created_at)}</span></span>
           <span class="chev">${ICON.chev}</span>
         </button>`).join('')}</div>` : '<div class="empty">Još nema obavijesti.</div>'}`,
   });
@@ -244,7 +270,7 @@ async function renderNotifications() {
 }
 
 /* ---------- live osvježavanje (realtime) ---------- */
-let liveCh = null, liveT = null, lastRoute = 0;
+let liveCh = null, liveT = null, lastRoute = 0, liveMute = 0, livePending = false, liveSilent = false, routeBusy = false;
 // ekrani koje smijemo ponovno učitati bez gubitka unosa (liste, detalji, kalendar; ne forme)
 function liveRefreshable() {
   const [path] = location.hash.slice(1).split('?');
@@ -254,21 +280,28 @@ function liveRefreshable() {
   if (a === 'todo') return !p[1];
   return false;
 }
+const liveSoon = () => { clearTimeout(liveT); liveT = setTimeout(liveRefresh, 500); };
+// tiho ponovno učitavanje otvorenog ekrana: bez "Učitavam…", uz zadržan scroll i otvorene <details>
 async function liveRefresh() {
-  if (!me || document.visibilityState === 'hidden' || !liveRefreshable()) return;
+  if (!me || !liveRefreshable()) { livePending = false; return; }
+  if (document.visibilityState === 'hidden' || routeBusy) { livePending = true; return; }
+  livePending = false;
   const y = window.scrollY;
-  await route();
+  const open = [...document.querySelectorAll('details')].map((d) => d.open);
+  liveSilent = true;
+  try { await route(); } finally { liveSilent = false; }
+  [...document.querySelectorAll('details')].forEach((d, i) => { if (open[i] != null) d.open = open[i]; });
   window.scrollTo(0, y);
 }
 async function startLive() {
   if (liveCh || !me) return;
   liveCh = sb.channel('polaris-live');
-  ['caterings', 'events', 'tasks'].forEach((t) => liveCh.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => { clearTimeout(liveT); liveT = setTimeout(liveRefresh, 500); }));
+  ['caterings', 'events', 'tasks'].forEach((t) => liveCh.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => { if (Date.now() < liveMute) return; liveSoon(); }));
   try { const { data: { session } } = await sb.auth.getSession(); if (session) sb.realtime.setAuth(session.access_token); } catch { /* bez tokena RLS ne propušta događaje; token stiže kod osvježenja */ }
   liveCh.subscribe();
 }
 function stopLive() { if (liveCh) { sb.removeChannel(liveCh); liveCh = null; } }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastRoute > 30000) liveRefresh(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (livePending || Date.now() - lastRoute > 30000)) liveRefresh(); });
 
 /* ---------- glavni izbornik ---------- */
 async function renderHome() {
@@ -760,9 +793,10 @@ function renderCal(box, rows, venue) {
 }
 
 async function renderKalendar() {
-  loading('Kalendar', '/');
+  const my = loading('Kalendar', '/');
   try {
     const rows = await loadRows();
+    if (stale(my)) return;
     const t = todayStr();
     const cnt = (v) => { const n = rows.filter((r) => r.venue === v && r.event_date >= t).length; return n ? `${n} ${plural(n, 'nadolazeći', 'nadolazeća', 'nadolazećih')}` : VENUES[v].sub; };
     screen({
@@ -773,16 +807,17 @@ async function renderKalendar() {
         <div id="cal"></div>`,
     });
     renderCal(document.getElementById('cal'), rows);
-  } catch (e) { failed('Kalendar', '/', e); }
+  } catch (e) { if (!stale(my)) failed('Kalendar', '/', e); }
 }
 
 let cateringTab = 'next'; // 'next' | 'past', pamti se dok je aplikacija otvorena
 let viewMode = 'list'; // 'list' | 'cal'
 async function renderVenueList(venue) {
   const V = VENUES[venue];
-  loading(V.name, '/kalendar');
+  const my = loading(V.name, '/kalendar');
   try {
     const rows = await loadRows(venue);
+    if (stale(my)) return;
     const t = todayStr();
     const tabs = { next: groupByDate(rows.filter((r) => r.event_date >= t)), past: groupByDate(rows.filter((r) => r.event_date < t)).reverse() };
     const count = (days) => days.reduce((s, [, ev]) => s + ev.length, 0);
@@ -815,7 +850,7 @@ async function renderVenueList(venue) {
       };
     };
     draw();
-  } catch (e) { failed(V.name, '/kalendar', e); }
+  } catch (e) { if (!stale(my)) failed(V.name, '/kalendar', e); }
 }
 
 /* ---------- CATERING: detalji, forma, pretpregled ---------- */
@@ -853,13 +888,14 @@ function cateringHero(c, extraChips = '') {
 }
 
 async function renderCateringDetail(id) {
-  loading('Catering', '/catering');
+  const my = loading('Catering', '/catering');
   try {
     const [c, items, ev] = await Promise.all([
       q(sb.from('caterings').select('*, creator:profiles(full_name)').eq('id', id).single()),
       loadItems(),
       sb.from('events').select('id, venue, title').eq('catering_id', id).limit(1).maybeSingle().then((r) => r.data, () => null),
     ]);
+    if (stale(my)) return;
     const parts = calcParts(costCalc(cateringCalc(c), items));
     screen({
       title: c.title || 'Catering', back: '/catering',
@@ -878,7 +914,7 @@ async function renderCateringDetail(id) {
         await q(sb.from('caterings').delete().eq('id', id)); toast('Obrisano'); go('/catering');
       } catch (e) { toast(errText(e)); }
     };
-  } catch (e) { failed('Catering', '/catering', e); }
+  } catch (e) { if (!stale(my)) failed('Catering', '/catering', e); }
 }
 
 function pkgButton(p, selected) {
@@ -1126,9 +1162,10 @@ async function renderCateringPreview() {
 /* ---------- EVENTI: Zona 7, Sala Luma ---------- */
 async function renderEventDetail(venue, id) {
   const V = VENUES[venue];
-  loading(V.name, V.path);
+  const my = loading(V.name, V.path);
   try {
     const e = await q(sb.from('events').select('*, creator:profiles(full_name), catering:caterings(id, title, package, custom, people, cutlery, plates, glasses, ice, tables, bar_tables, price_per_person)').eq('id', id).single());
+    if (stale(my)) return;
     const d = parseDate(e.event_date);
     const cat = e.catering;
     const k = cat ? cateringCalc(cat) : null;
@@ -1165,7 +1202,7 @@ async function renderEventDetail(venue, id) {
       if (!confirm(cat ? 'Obrisati event? Njegov catering ostaje u popisu cateringa.' : 'Obrisati ovaj event?')) return;
       try { await q(sb.from('events').delete().eq('id', id)); toast('Obrisano'); go(V.path); } catch (err) { toast(errText(err)); }
     };
-  } catch (err) { failed(V.name, V.path, err); }
+  } catch (err) { if (!stale(my)) failed(V.name, V.path, err); }
 }
 
 async function renderEventForm(venue, id, params) {
@@ -1876,7 +1913,7 @@ async function renderTodo() {
   const admin = isAdmin();
   const title = admin ? 'To-do' : 'Moji zadaci';
   const back = admin ? '/' : null;
-  loading(title, back);
+  const my = loading(title, back);
   try {
     let people = [];
     let query = sb.from('tasks').select('*, assignee:profiles!tasks_assigned_to_fkey(full_name)').order('due_date', { nullsFirst: false }).order('created_at');
@@ -1885,6 +1922,7 @@ async function renderTodo() {
       if (todoFilter) query = query.eq('assigned_to', todoFilter);
     } else query = query.eq('assigned_to', me.id);
     const rows = await q(query);
+    if (stale(my)) return;
     const open = rows.filter((t) => !t.done);
     const done = rows.filter((t) => t.done).sort((a, b) => b.done_at.localeCompare(a.done_at)).slice(0, 30);
     const t0 = todayStr();
@@ -1906,11 +1944,11 @@ async function renderTodo() {
     screen({
       title, back, action: admin ? '/todo/new' : null,
       body: `
-        ${admin ? `<select id="pf" style="margin-bottom:6px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : `<p class="muted" style="margin:-6px 4px 6px">Bok, ${esc(me.full_name)}</p>`}
+        ${admin ? `<select id="pf" style="margin-bottom:6px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : `<p class="muted" style="margin:-6px 4px 6px">Bok, ${esc(me.full_name)}</p><div id="pushask"></div>`}
         <div class="section-title">Za napraviti</div>
         ${open.length ? groupOf(open) : '<div class="empty">Nema otvorenih zadataka.</div>'}
         ${done.length ? `<div class="section-title">Gotovo</div>${groupOf(done)}` : ''}
-        ${admin ? '' : `<div id="pushask"></div><div class="footer-links"><button class="link" data-go="/obavijesti">Obavijesti</button><button class="link" data-go="/pin">Promijeni PIN</button><button class="link" id="logout">Odjava</button></div>`}`,
+        ${admin ? '' : `<div class="footer-links"><button class="link" data-go="/obavijesti">Obavijesti</button><button class="link" data-go="/pin">Promijeni PIN</button><button class="link" id="logout">Odjava</button></div>`}`,
     });
     const lo = document.getElementById('logout'); if (lo) lo.onclick = logout;
     if (!admin) pushAskCard();
@@ -1923,7 +1961,7 @@ async function renderTodo() {
       if (!confirm('Obrisati zadatak?')) return;
       try { await q(sb.from('tasks').delete().eq('id', b.dataset.del)); renderTodo(); } catch (e) { toast(errText(e)); }
     }));
-  } catch (e) { failed(title, back, e); }
+  } catch (e) { if (!stale(my)) failed(title, back, e); }
 }
 
 async function renderTaskForm() {
@@ -1964,7 +2002,7 @@ function renderAdmin() {
 }
 
 async function renderActivity() {
-  loading('Radnje', '/admin');
+  const my = loading('Radnje', '/admin');
   try {
     const [tasks, cats, items, evs] = await Promise.all([
       q(sb.from('tasks').select('title, done, done_at, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), creator:profiles!tasks_created_by_fkey(full_name)').order('created_at', { ascending: false }).limit(40)),
@@ -1972,6 +2010,7 @@ async function renderActivity() {
       q(sb.from('items').select('name, price_net, unit, updated_at, suppliers(name)').order('updated_at', { ascending: false }).limit(20)),
       q(sb.from('events').select('title, venue, event_date, created_at, creator:profiles(full_name)').order('created_at', { ascending: false }).limit(20)),
     ]);
+    if (stale(my)) return;
     const ev = [];
     tasks.forEach((t) => {
       ev.push({ at: t.created_at, txt: `${t.creator?.full_name || 'Admin'} zadao: ${t.title} → ${t.assignee?.full_name || ''}` });
@@ -1986,7 +2025,7 @@ async function renderActivity() {
       body: ev.length ? `<div class="group">${ev.slice(0, 50).map((e) => `
         <div class="cell static"><span class="main"><span style="display:block;${e.good ? 'color:var(--done);font-weight:600' : ''}">${esc(e.txt)}</span><span class="meta">${fmtStamp(e.at)}</span></span></div>`).join('')}</div>` : '<div class="empty">Još nema radnji.</div>',
     });
-  } catch (e) { failed('Radnje', '/admin', e); }
+  } catch (e) { if (!stale(my)) failed('Radnje', '/admin', e); }
 }
 
 const ROLE = { super_admin: 'Super admin', admin: 'Admin', user: 'Zaposlenik' };
@@ -2087,11 +2126,15 @@ function renderMyPin() {
 /* ---------- router ---------- */
 async function route() {
   if (!me) return renderLogin();
-  lastRoute = Date.now();
+  lastRoute = Date.now(); renderSeq++;
   if (!liveCh) startLive();
   const [path, qs] = location.hash.slice(1).split('?');
   const params = new URLSearchParams(qs || '');
   const p = (path || '/').split('/').filter(Boolean);
+  routeBusy = true;
+  try { return await dispatch(p, params); } finally { routeBusy = false; if (livePending) liveSoon(); }
+}
+async function dispatch(p, params) {
   if (!isAdmin() && !['', 'pin', 'obavijesti'].includes(p[0] || '')) return renderTodo();
   if (!isSuper() && ['admin', 'radnje', 'korisnici'].includes(p[0])) return renderHome();
   switch (p[0]) {
@@ -2137,11 +2180,15 @@ async function route() {
 }
 
 window.addEventListener('hashchange', route);
-sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') { me = null; renderLogin(); } });
-(async () => { await loadMe(); route(); flushPush(); })();
+sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') { me = null; stopLive(); renderLogin(); } });
+(async () => { await loadMe(); if (!me && location.hash.length > 2) pendingGo = location.hash; route(); flushPush(); })();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
   // klik na obavijest dok je aplikacija otvorena: service worker javi kamo otići
-  navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'go' && typeof e.data.url === 'string') location.hash = e.data.url.startsWith('#') ? e.data.url : `#${e.data.url}`; });
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type !== 'go' || typeof e.data.url !== 'string') return;
+    const h = e.data.url.startsWith('#') ? e.data.url : `#${e.data.url}`;
+    if (me) location.hash = h; else pendingGo = h; // na ekranu prijave ne diraj unos
+  });
 }

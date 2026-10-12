@@ -113,6 +113,8 @@ main { padding: 0 16px 16px; }
   display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 16px;
   border: 0; background: none; text-align: left; cursor: pointer; min-width: 0;
 }
+.cell.unread { background: var(--accent-soft); }
+.cell.unread .title::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: 2px; }
 .cell:active { background: var(--fill); }
 .cell.static { cursor: default; }
 .cell.static:active { background: none; }
@@ -424,9 +426,10 @@ input[type=number] { -moz-appearance: textfield; }
 .pushask .txt { display: grid; gap: 2px; font-size: 15px; }
 .pushask .txt span { color: var(--muted); font-size: 14px; }
 .pushask .btn { grid-column: 1 / -1; margin-top: 6px; }
-.pushask .link { grid-column: 1 / -1; justify-self: center; padding: 4px 0 0; }
+.pushask .link { grid-column: 1 / -1; justify-self: center; min-height: 44px; padding: 10px 16px 6px; }
 .pushcard { padding: 16px; display: grid; gap: 12px; }
-.pushstate { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: var(--muted); }
+.pushstate { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: var(--ink); }
 .pushstate svg { width: 22px; height: 22px; flex: none; }
 .pushstate.on { color: var(--accent); }
 .pushcard .small { margin: 0; }
+.pushcard .btn.secondary { background: var(--fill); border: 1px solid var(--line); box-shadow: none; }
