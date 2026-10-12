@@ -442,7 +442,7 @@ function calcParts(k) {
   if (k.iceKg) tiles.push([`${k.iceKg} kg`, 'leda', `${k.iceBags} ${plural(k.iceBags, 'vreća', 'vreće', 'vreća')} × ${ICE_KG} kg`]);
   const takeRows = [];
   const eq = [];
-  if (k.food && k.tongs) eq.push(krow('Prihvataljke', String(k.tongs), `${k.banjice} za banjice${k.saladN ? ` + ${k.saladN} za salate` : ''}`));
+  if (k.food && k.tongs) eq.push(krow('Prihvataljke', String(k.tongs), [k.banjice && `${k.banjice} za banjice`, k.saladN && `${k.saladN} za salate`].filter(Boolean).join(' + ')));
   if (k.food && k.gels) eq.push(krow('Gelovi za grijanje', String(k.gels), `${GELS_PER_BANJICA} po banjici`));
   if (k.cutlery) ['Vilice', 'Žlice', 'Noževi', 'Salvete'].forEach((t) => eq.push(krow(t, String(k.n))));
   if (k.plates) { eq.push(krow('Tanjuri', String(k.n))); if (k.soups) eq.push(krow('Zdjelice za juhu', String(k.n))); }
@@ -493,7 +493,7 @@ function calcParts(k) {
     ];
     const sideQty = [k.sideG && kgTxt(k.sideG), pcsRows.length && `${pcsRows.reduce((a, x) => a + x.pieces, 0)} kom`, k.lazanjere && `${k.lazanjere} laz.`].filter(Boolean).join(' + ');
     const dessertRows = (k.cakesKg ? brow('Domaći kolači', `${num(k.cakesKg, 1)} kg`, `${num(k.cakesKg, 1)} kg`, `${CAKES_KG_PER_10} kg na 10 osoba`) : '') + (k.torte || []).filter((t) => t.cnt).map((t) => brow(t.name, `${t.cnt} kom`, `${t.cnt} kom`, `1 torta na ${TORTA_PEOPLE} osoba`)).join('');
-    buy = `<div class="section-title">Za kupiti</div><div class="kcard">
+    buy = `<div class="section-title">Za kupiti</div><div class="kcard buy">
       ${head}
       ${k.meat ? group('Meso', right(kgTxt(k.meatG), k.meat), k.meat.map(meatRow).join(''), k.ratio) : ''}
       ${sideRows.length ? group('Prilozi', right(sideQty, [...(k.sides || []), ...pcsRows, ...(k.laz || [])]), sideRows.join('')) : ''}
@@ -786,7 +786,12 @@ async function renderCateringForm(id, params) {
   if (resume) c = cDraft;
   else {
     c = { event_date: params.get('d') || todayStr(), custom: null };
-    if (id) { loading('Uredi catering', `/catering/${id}`); try { c = await q(sb.from('caterings').select('*').eq('id', id).single()); } catch (e) { toast(errText(e)); } }
+    if (id) {
+      // Ako se zapis ne učita, ne prikazujemo praznu formu (Spremi bi prepisao catering praznim poljima).
+      const back = forEvent ? evFormRoute() : `/catering/${id}`;
+      loading('Uredi catering', back);
+      try { c = await q(sb.from('caterings').select('*').eq('id', id).single()); } catch (e) { return failed('Uredi catering', back, e); }
+    }
     else if (forEvent) c = { ...c, title: eDraft.title, event_date: eDraft.event_date, event_time: eDraft.start_time, people: eDraft.people, location: VENUES[eDraft.venue].name, contact: eDraft.contact };
   }
   const isCustom = !PACKAGES[c.package] && c.custom && Object.keys(c.custom).some((k) => FOOD[k] && c.custom[k]);
@@ -1040,7 +1045,7 @@ async function renderEventForm(venue, id, params) {
   else {
     eDraft = null;
     e = { venue, event_date: params.get('d') || todayStr(), catering: null, catering_id: null };
-    if (id) { loading('Uredi event', `${V.path}/${id}`); try { e = { ...(await q(sb.from('events').select('*').eq('id', id).single())), catering: null }; } catch (err) { toast(errText(err)); } }
+    if (id) { loading('Uredi event', `${V.path}/${id}`); try { e = { ...(await q(sb.from('events').select('*').eq('id', id).single())), catering: null }; } catch (err) { return failed('Uredi event', `${V.path}/${id}`, err); } }
   }
   let linked = null; // postojeći catering iz baze
   if (e.catering_id) { try { linked = await q(sb.from('caterings').select('id, title, package, custom, people, cutlery, plates, glasses, ice, tables, bar_tables, price_per_person').eq('id', e.catering_id).maybeSingle()); } catch { /* ostaje null */ } }
@@ -1222,7 +1227,7 @@ async function renderAllItems() {
 
 async function renderSupplierForm(id, cat) {
   let s = { categories: [cat || 'food'] };
-  if (id) { try { s = await q(sb.from('suppliers').select('*').eq('id', id).single()); } catch (e) { toast(errText(e)); } }
+  if (id) { try { s = await q(sb.from('suppliers').select('*').eq('id', id).single()); } catch (e) { return failed('Uredi dobavljača', cat ? `/nabavka/${cat}/${id}` : `/nabavka/${id}`, e); } }
   const back = id ? (cat ? `/nabavka/${cat}/${id}` : `/nabavka/${id}`) : (cat ? `/nabavka/${cat}` : '/nabavka');
   screen({
     title: id ? 'Uredi dobavljača' : 'Novi dobavljač', back,
