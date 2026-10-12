@@ -32,6 +32,7 @@ const plural = (n, one, few, many) => (n % 10 === 1 && n % 100 !== 11 ? one : n 
 
 const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICON = {
+  bell: svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>'),
   people: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
   clock: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
   pin: svg('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'),
@@ -129,7 +130,7 @@ function renderLogin() {
     if (error) { document.getElementById('err').textContent = errText(error); btn.disabled = false; return; }
     await loadMe();
     if (!me) { document.getElementById('err').textContent = 'Račun nije aktivan.'; await sb.auth.signOut(); btn.disabled = false; return; }
-    location.hash = '#/'; route();
+    location.hash = '#/'; route(); flushPush();
   };
 }
 
@@ -140,7 +141,134 @@ async function loadMe() {
   me = data && data.active ? data : null;
 }
 
-async function logout() { await sb.auth.signOut(); me = null; location.hash = '#/'; renderLogin(); }
+async function logout() {
+  try { const sub = await pushSubscription(); if (sub) await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); } catch { /* nije nužno */ }
+  stopLive();
+  await sb.auth.signOut(); me = null; location.hash = '#/'; renderLogin();
+}
+
+/* ---------- push obavijesti ---------- */
+const PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const swReady = () => Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(() => r(null), 4000))]);
+async function pushSubscription() {
+  if (!PUSH_OK) return null;
+  try { const reg = await swReady(); return reg ? await reg.pushManager.getSubscription() : null; } catch { return null; }
+}
+const b64ToBytes = (b64) => { const s = (b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); };
+const pushLater = { get: () => { try { return !!localStorage.getItem('polaris-push-later'); } catch { return false; } }, set: () => { try { localStorage.setItem('polaris-push-later', '1'); } catch { /* privatni način */ } } };
+// pošalje što čeka u redu obavijesti (poziva se nakon dodavanja zadatka/termina i pri otvaranju aplikacije)
+function flushPush() { if (me) sb.functions.invoke('push-send', { body: { action: 'flush' } }).catch(() => {}); }
+// je li ovaj uređaj registriran za obavijesti prijavljenog korisnika
+async function pushRegistered() {
+  const sub = await pushSubscription();
+  if (!sub) return false;
+  try { return !!(await q(sb.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).maybeSingle())); } catch { return false; }
+}
+async function enablePush() {
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Obavijesti su blokirane u postavkama preglednika za ovu aplikaciju.' : 'Obavijesti nisu dopuštene.');
+  const reg = await swReady();
+  if (!reg) throw new Error('Aplikacija još nije spremna, pokušaj ponovno za koji trenutak.');
+  const { data, error } = await sb.functions.invoke('push-send', { body: { action: 'key' } });
+  if (error || !data?.key) throw new Error('Ne mogu dohvatiti ključ za obavijesti.');
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.key) });
+  const j = sub.toJSON();
+  await q(sb.rpc('register_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_user_agent: navigator.userAgent }));
+}
+async function disablePush() {
+  const sub = await pushSubscription();
+  if (!sub) return;
+  try { await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); } catch { /* red možda ne postoji */ }
+  await sub.unsubscribe();
+}
+// kartica "Uključi obavijesti" na početnom ekranu (dok uređaj nije registriran)
+async function pushAskCard() {
+  if (!document.getElementById('pushask') || !PUSH_OK || Notification.permission === 'denied' || pushLater.get()) return;
+  if (await pushRegistered()) return;
+  const el = document.getElementById('pushask');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="kcard pushask">
+      <span class="ico">${ICON.bell}</span>
+      <span class="txt"><b>Uključi obavijesti</b><span>Zadaci${isAdmin() ? ', novi domjenci i eventi' : ''} stižu na ovaj uređaj.</span></span>
+      <button class="btn tap" id="pushon">Uključi</button>
+      <button class="link" id="pushlater">Kasnije</button>
+    </div>`;
+  document.getElementById('pushon').onclick = async (e) => {
+    e.target.disabled = true;
+    try { await enablePush(); toast('Obavijesti uključene'); el.innerHTML = ''; } catch (err) { toast(errText(err)); e.target.disabled = false; }
+  };
+  document.getElementById('pushlater').onclick = () => { pushLater.set(); el.innerHTML = ''; };
+}
+async function renderNotifications() {
+  loading('Obavijesti', '/');
+  let rows;
+  try { rows = await q(sb.from('notifications').select('id, title, body, url, created_at, read_at').eq('user_id', me.id).order('created_at', { ascending: false }).limit(30)); } catch (e) { return failed('Obavijesti', '/', e); }
+  const on = PUSH_OK && Notification.permission === 'granted' && await pushRegistered();
+  let status, hint = '';
+  if (!PUSH_OK) {
+    if (isIOS && !isStandalone()) { status = 'Na iPhoneu obavijesti rade tek kad je aplikacija na početnom zaslonu.'; hint = 'Safari → Dijeli → Dodaj na početni zaslon, zatim otvori Polaris s početnog zaslona i ovdje uključi obavijesti.'; }
+    else status = 'Ovaj preglednik ne podržava obavijesti.';
+  } else if (Notification.permission === 'denied') status = 'Obavijesti su blokirane u postavkama preglednika za ovu aplikaciju.';
+  else status = on ? 'Uključene na ovom uređaju' : 'Isključene na ovom uređaju';
+  const canToggle = PUSH_OK && Notification.permission !== 'denied';
+  screen({
+    title: 'Obavijesti', back: '/',
+    body: `
+      <div class="kcard pushcard">
+        <div class="pushstate ${on ? 'on' : ''}">${ICON.bell}<span>${esc(status)}</span></div>
+        ${hint ? `<p class="muted small">${esc(hint)}</p>` : ''}
+        ${canToggle ? `<button class="btn ${on ? 'secondary' : ''} tap" id="pushbtn">${on ? 'Isključi na ovom uređaju' : 'Uključi obavijesti na ovom uređaju'}</button>` : ''}
+        <p class="muted small">Stiže obavijest kad dobiješ zadatak${isAdmin() ? ' i kad netko doda catering ili event' : ''}.</p>
+      </div>
+      <div class="section-title">Zadnje obavijesti</div>
+      ${rows.length ? `<div class="group">${rows.map((n) => `
+        <button class="cell" data-go="${esc((n.url || '#/').replace(/^#/, ''))}">
+          <span class="main"><span class="title one" style="display:block;${n.read_at ? 'font-weight:500' : ''}">${esc(n.title)}</span>${n.body ? `<span class="meta" style="display:block">${esc(n.body)}</span>` : ''}<span class="meta" style="display:block">${fmtStamp(n.created_at)}</span></span>
+          <span class="chev">${ICON.chev}</span>
+        </button>`).join('')}</div>` : '<div class="empty">Još nema obavijesti.</div>'}`,
+  });
+  const btn = document.getElementById('pushbtn');
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      if (on) { await disablePush(); toast('Obavijesti isključene'); } else { await enablePush(); toast('Obavijesti uključene'); }
+      renderNotifications();
+    } catch (e) { toast(errText(e)); btn.disabled = false; }
+  };
+  const unread = rows.filter((n) => !n.read_at).map((n) => n.id);
+  if (unread.length) sb.from('notifications').update({ read_at: new Date().toISOString() }).in('id', unread).then(() => {}, () => {});
+}
+
+/* ---------- live osvježavanje (realtime) ---------- */
+let liveCh = null, liveT = null, lastRoute = 0;
+// ekrani koje smijemo ponovno učitati bez gubitka unosa (liste, detalji, kalendar; ne forme)
+function liveRefreshable() {
+  const [path] = location.hash.slice(1).split('?');
+  const p = (path || '/').split('/').filter(Boolean); const a = p[0] || '';
+  if (['', 'kalendar', 'radnje', 'obavijesti'].includes(a)) return true;
+  if (['catering', 'zona7', 'luma'].includes(a)) return !['new', 'pregled'].includes(p[1]) && p[2] !== 'edit';
+  if (a === 'todo') return !p[1];
+  return false;
+}
+async function liveRefresh() {
+  if (!me || document.visibilityState === 'hidden' || !liveRefreshable()) return;
+  const y = window.scrollY;
+  await route();
+  window.scrollTo(0, y);
+}
+async function startLive() {
+  if (liveCh || !me) return;
+  liveCh = sb.channel('polaris-live');
+  ['caterings', 'events', 'tasks'].forEach((t) => liveCh.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => { clearTimeout(liveT); liveT = setTimeout(liveRefresh, 500); }));
+  try { const { data: { session } } = await sb.auth.getSession(); if (session) sb.realtime.setAuth(session.access_token); } catch { /* bez tokena RLS ne propušta događaje; token stiže kod osvježenja */ }
+  liveCh.subscribe();
+}
+function stopLive() { if (liveCh) { sb.removeChannel(liveCh); liveCh = null; } }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastRoute > 30000) liveRefresh(); });
 
 /* ---------- glavni izbornik ---------- */
 async function renderHome() {
@@ -156,12 +284,15 @@ async function renderHome() {
           ${menuBtn('/restoran', 'utensils', 'gold', 'Restoran', 'Jelovnik, normativ, nabavka')}
           ${menuBtn('/todo', 'todo', 'green', 'To-do', todo)}
         </div>
+        <div id="pushask"></div>
         <div class="footer-links">
+          <button class="link" data-go="/obavijesti">Obavijesti</button>
           <button class="link" data-go="/pin">Promijeni PIN</button>
           <button class="link" id="logout">Odjava</button>
         </div>`,
     });
     document.getElementById('logout').onclick = logout;
+    pushAskCard();
   };
   draw();
   try {
@@ -978,7 +1109,7 @@ async function renderCateringPreview() {
       if (evRoute && !c.id) { eDraft.catering = cateringRow(c); cDraft = null; go(evRoute); return; }
       let cid = c.id;
       if (cid) await q(sb.from('caterings').update(cateringRow(c)).eq('id', cid));
-      else cid = (await q(sb.from('caterings').insert(cateringRow(c)).select('id').single())).id;
+      else { cid = (await q(sb.from('caterings').insert(cateringRow(c)).select('id').single())).id; flushPush(); }
       cDraft = null;
       toast('Spremljeno');
       if (evRoute) { eDraft.catering_id = cid; eDraft.catering = null; go(evRoute); } else go(`/catering/${cid}`);
@@ -1110,7 +1241,7 @@ async function renderEventForm(venue, id, params) {
       const row = { venue, title: s.title, people: s.people, event_date: s.event_date, start_time: s.start_time, end_time: s.end_time, contact: s.contact, description: s.description, catering_id };
       let eid = id;
       if (id) await q(sb.from('events').update(row).eq('id', id));
-      else eid = (await q(sb.from('events').insert(row).select('id').single())).id;
+      else { eid = (await q(sb.from('events').insert(row).select('id').single())).id; flushPush(); }
       eDraft = null; cDraft = null;
       toast('Spremljeno');
       go(`${V.path}/${eid}`);
@@ -1779,9 +1910,10 @@ async function renderTodo() {
         <div class="section-title">Za napraviti</div>
         ${open.length ? groupOf(open) : '<div class="empty">Nema otvorenih zadataka.</div>'}
         ${done.length ? `<div class="section-title">Gotovo</div>${groupOf(done)}` : ''}
-        ${admin ? '' : `<div class="footer-links"><button class="link" data-go="/pin">Promijeni PIN</button><button class="link" id="logout">Odjava</button></div>`}`,
+        ${admin ? '' : `<div id="pushask"></div><div class="footer-links"><button class="link" data-go="/obavijesti">Obavijesti</button><button class="link" data-go="/pin">Promijeni PIN</button><button class="link" id="logout">Odjava</button></div>`}`,
     });
     const lo = document.getElementById('logout'); if (lo) lo.onclick = logout;
+    if (!admin) pushAskCard();
     const pf = document.getElementById('pf'); if (pf) pf.onchange = () => { todoFilter = pf.value; renderTodo(); };
     app.querySelectorAll('[data-done]').forEach((b) => (b.onclick = async () => {
       b.disabled = true;
@@ -1814,6 +1946,7 @@ async function renderTaskForm() {
     e.preventDefault();
     try {
       await q(sb.from('tasks').insert({ title: val(f, 'title'), description: val(f, 'description'), assigned_to: val(f, 'assigned_to'), due_date: val(f, 'due_date') }));
+      flushPush();
       toast('Zadatak zadan'); go('/todo');
     } catch (err) { document.getElementById('err').textContent = errText(err); }
   };
@@ -1954,14 +2087,17 @@ function renderMyPin() {
 /* ---------- router ---------- */
 async function route() {
   if (!me) return renderLogin();
+  lastRoute = Date.now();
+  if (!liveCh) startLive();
   const [path, qs] = location.hash.slice(1).split('?');
   const params = new URLSearchParams(qs || '');
   const p = (path || '/').split('/').filter(Boolean);
-  if (!isAdmin() && !['', 'pin'].includes(p[0] || '')) return renderTodo();
+  if (!isAdmin() && !['', 'pin', 'obavijesti'].includes(p[0] || '')) return renderTodo();
   if (!isSuper() && ['admin', 'radnje', 'korisnici'].includes(p[0])) return renderHome();
   switch (p[0]) {
     case undefined: return renderHome();
     case 'pin': return renderMyPin();
+    case 'obavijesti': return renderNotifications();
     case 'kalendar': return renderKalendar();
     case 'catering':
       if (!p[1]) return renderVenueList('catering');
@@ -2002,6 +2138,10 @@ async function route() {
 
 window.addEventListener('hashchange', route);
 sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') { me = null; renderLogin(); } });
-(async () => { await loadMe(); route(); })();
+(async () => { await loadMe(); route(); flushPush(); })();
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // klik na obavijest dok je aplikacija otvorena: service worker javi kamo otići
+  navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'go' && typeof e.data.url === 'string') location.hash = e.data.url.startsWith('#') ? e.data.url : `#${e.data.url}`; });
+}
