@@ -253,7 +253,7 @@ const ICE_BAG_COST = 10; // € po vreći od 10 kg (minimalna narudžba)
 const pcsPor = (n, key) => Math.max(1, ceil((n * PCS_PER_PERSON) / FOOD[key].pcs)); // porcija pohanog u paketu
 
 const split = (total, k) => Array.from({ length: k }, (_, i) => Math.floor(total / k) + (i < total % k ? 1 : 0));
-const ceil = (x) => Math.ceil(x - 1e-9);
+const ceil = (x) => Math.ceil(x - 1e-9) || 0; // || 0 da ne vrati -0
 const up50 = (g) => ceil(g / 50) * 50;
 const kgTxt = (g) => (g >= 1000 ? `${num(g / 1000, 2)} kg` : `${Math.round(g)} g`);
 const krug = (n) => `${n} ${plural(n, 'krug', 'kruga', 'krugova')}`;
@@ -426,7 +426,7 @@ function calcParts(k) {
   if (k.food) {
     if (k.banjice) tiles.push([k.banjice, plural(k.banjice, 'banjica', 'banjice', 'banjica'), 'meso i prilozi']);
     if (k.lazanjere) tiles.push([k.lazanjere, plural(k.lazanjere, 'lazanjera', 'lazanjere', 'lazanjera'), lower(k.laz)]);
-    if (k.pcs.length) tiles.push([k.pcs.reduce((s, x) => s + x.por, 0), 'porcija po 10 kom', k.pcs.map((x) => `${x.name.toLowerCase()} ${x.por}`).join(' · ')]);
+    if (k.pcs.length) { const porN = k.pcs.reduce((s, x) => s + x.por, 0); tiles.push([porN, `${plural(porN, 'porcija', 'porcije', 'porcija')} po 10 kom`, k.pcs.map((x) => `${x.name.toLowerCase()} ${x.por}`).join(' · ')]); }
     if (k.saladN) tiles.push([k.saladN, plural(k.saladN, 'salata', 'salate', 'salata'), lower(k.salads)]);
     if (k.breadN) tiles.push([k.breadN, `${plural(k.breadN, 'krug', 'kruga', 'krugova')} lepinjica`, lower(k.breads)]);
     if (k.soupL) tiles.push([`${num(k.soupL, 1)} l`, 'juhe', k.soups.map((s) => s.short).join(' · ')]);
@@ -455,11 +455,11 @@ function calcParts(k) {
   if (k.food || k.iceKg) {
     const pcsRows = k.pcs || [];
     const all = [...(k.meat || []), ...(k.sides || []), ...pcsRows, ...(k.laz || []), ...(k.salads || []), ...(k.breads || []), ...(k.soups || [])];
-    const missing = all.filter((x) => x.cost == null).length;
+    const missing = all.filter((x) => x.cost == null).length + (k.cakesKg ? 1 : 0) + (k.torte || []).filter((t) => t.cnt).length;
     const total = sumCost(all) + (k.iceCost || 0);
     let note = '';
     if (k.food) {
-      note = 'Cijene iz Nabavke (Food) bez PDV-a; lepinjice, lazanjere, juhe i led po dogovorenom food costu.';
+      note = `Cijene iz Nabavke (Food) bez PDV-a; lepinjice, lazanjere, juhe i led po dogovorenom food costu${k.cakesKg || k.tortN ? '; kolači i torte još bez cijene' : ''}.`;
       if (!k.priced) note = 'Učitavam cijene iz Nabavke…';
       else {
         if (missing) note += ` ${missing} ${plural(missing, 'stavka nema', 'stavke nemaju', 'stavki nema')} cijenu.`;
@@ -814,7 +814,8 @@ async function renderCateringForm(id, params) {
   });
   const f = document.getElementById('f');
   let items = null;
-  const touched = new Set(c._touched || []); // porcije koje je Nevio sam namjestio
+  // porcije koje je Nevio sam namjestio: u nacrtu ih pamtimo, kod spremljenog zapisa su to one koje odstupaju od prijedloga za spremljeni broj ljudi
+  const touched = new Set(c._touched || Object.keys(custom).filter((k) => FOOD[k]?.group === 'pcs' && custom[k] && Number(custom[k]) !== pcsPor(Number(c.people) || 0, k)).map((k) => `por_${k}`));
   const state = () => {
     const s = {
       package: Number(f.elements.package.value) || null, people: numVal(f, 'people'), cutlery: f.elements.cutlery.checked, ice: f.elements.ice.checked,
