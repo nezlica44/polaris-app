@@ -14,6 +14,10 @@
   --done: #2f9e5b;
   --radius: 14px;
   --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 1px 1px rgba(0, 0, 0, .03);
+  /* boje sala (rgb tripleti, koriste se kao rgb(var(--v-…)) i rgba(var(--v-…), a)) */
+  --v-catering: 31, 92, 69;
+  --v-zona7: 200, 150, 46;
+  --v-luma: 58, 120, 194;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -26,6 +30,9 @@
     --accent: #5fc39a;
     --accent-ink: #062016;
     --accent-soft: #163327;
+    --v-catering: 95, 195, 154;
+    --v-zona7: 227, 180, 86;
+    --v-luma: 111, 163, 232;
     --gold: #e3b456;
     --gold-soft: #33280f;
     --danger: #ff6b5e;
@@ -34,6 +41,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
@@ -145,11 +153,20 @@ main { padding: 0 16px 16px; }
 }
 .ev .body { flex: 1; min-width: 0; }
 .ev .title { font-weight: 700; font-size: 16px; }
-.ev .meta { display: flex; gap: 12px; margin-top: 4px; color: var(--muted); font-size: 14px; min-width: 0; }
+.ev .meta { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 4px; color: var(--muted); font-size: 14px; min-width: 0; }
 .ev .meta span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .ev .loc { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 14px; color: var(--ink); min-width: 0; }
 .ev svg { width: 15px; height: 15px; flex: none; }
 .ev .meta .unset { opacity: .6; }
+.ev .meta .i-people svg { color: #3a78c2; }
+.ev .meta .i-clock svg { color: #e08a1e; }
+.ev .loc svg { color: #d1372b; }
+.ptag.green { background: var(--accent-soft); color: var(--accent); }
+.who { flex: none; padding: 4px 10px; border-radius: 9px; background: #e4eefb; color: #2b63b5; font-size: 12px; font-weight: 700; }
+.chip.who { background: #e4eefb; color: #2b63b5; }
+.chip.link { border: 0; cursor: pointer; font: inherit; font-weight: 600; min-height: 36px; padding: 8px 12px; }
+.chip.link svg { width: 14px; height: 14px; margin: 0 -4px 0 -2px; }
+@media (prefers-color-scheme: dark) { .who, .chip.who { background: #1b3557; color: #8fbcf5; } }
 .day.compact .ev { padding: 9px 12px; }
 .day.compact .ev .title { font-size: 15px; }
 .day.compact .ev .meta { margin-top: 2px; font-size: 13px; }
@@ -310,13 +327,14 @@ input[type=checkbox].sw::before {
 input[type=checkbox].sw:checked { background: var(--done); }
 input[type=checkbox].sw:checked::before { transform: translateX(20px); }
 .stepper { flex: none; display: inline-flex; align-items: center; border-radius: 9px; background: var(--fill); }
-.stepper button { width: 38px; height: 34px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--accent); font-size: 22px; line-height: 1; }
+.stepper button { width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--accent); font-size: 24px; line-height: 1; }
 .stepper output { min-width: 24px; text-align: center; font-weight: 700; font-size: 16px; }
 
 /* Kalkulator cateringa */
 .kcard { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 2px 16px; }
 .kgroup + .kgroup { margin-top: 4px; }
 .khead { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0 4px; font-size: 13px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--accent); }
+.ksub { padding: 0 0 6px; font-size: 13px; color: var(--muted); }
 .krow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; min-width: 0; font-size: 15px; }
 .krow + .krow { border-top: 1px solid var(--line); }
 .krow > :first-child { min-width: 0; overflow-wrap: anywhere; }
@@ -358,3 +376,27 @@ input[type=number] { -moz-appearance: textfield; }
 .kcard.pay[open] .more svg { transform: rotate(90deg); }
 .kcard.pay[open] summary { border-bottom: 1px solid var(--line); }
 .krow .v .cost { display: block; margin-top: 1px; font-size: 13px; font-weight: 500; color: var(--muted); }
+
+/* Kalendar: mjesec s kućicama obojanim po salama */
+.cal { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 10px 12px; }
+.calhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.calhead button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--fill); color: var(--accent); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.calhead button svg { width: 22px; height: 22px; }
+.calmonth { font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
+.calgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cw { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; padding: 4px 0 2px; }
+.cday { position: relative; aspect-ratio: 1; min-width: 0; border: 2px solid transparent; border-radius: 10px; background: var(--fill); color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer; padding: 0; }
+.cday.blank { background: none; cursor: default; }
+.cday.busy { font-weight: 800; }
+.cday.today { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.cday.sel { border-color: var(--ink); }
+.cday i { position: absolute; top: 2px; right: 4px; font-style: normal; font-size: 10px; font-weight: 700; color: inherit; opacity: .75; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; }
+.cell .vbar { flex: none; width: 4px; align-self: stretch; border-radius: 2px; margin: -2px 0; }
+
+/* Custom domjenak: prekidači sa steperom koji se pojavi tek kad je jelo uključeno */
+.xrow .stw { flex: none; }
+.xrow .stepper output { min-width: 26px; }
+.ftitle + .pkgs, .ftitle + .xopts { margin-top: 2px; }
