@@ -376,6 +376,15 @@ input[type=number] { -moz-appearance: textfield; }
 .kcard.pay[open] .more svg { transform: rotate(90deg); }
 .kcard.pay[open] summary { border-bottom: 1px solid var(--line); }
 .krow .v .cost { display: block; margin-top: 1px; font-size: 13px; font-weight: 500; color: var(--muted); }
+/* Za kupiti u dva stupca: Pripremiti (kom, porcije) i Kupiti (kg, kom za nabavu) */
+.krow.cols { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: center; }
+.krow.cols .c1, .krow.cols .c2 { font-weight: 700; white-space: nowrap; text-align: right; min-width: 56px; }
+.krow.cols .c1 { color: var(--ink); font-weight: 600; }
+.krow.cols .c2 .cost { display: block; margin-top: 1px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.krow.cols.head { padding: 10px 0 2px; border: 0; }
+.krow.cols.head span { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+.krow.cols.head + .kgroup .khead { padding-top: 6px; }
+.take .krow .sub { color: rgba(255, 255, 255, .72); }
 
 /* Kalendar: mjesec s kućicama obojanim po salama */
 .cal { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 10px 12px; }
