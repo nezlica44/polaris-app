@@ -488,3 +488,25 @@ a.btn { display: flex; align-items: center; justify-content: center; text-decora
 .wolt { font-style: normal; font-weight: 800; font-size: 9px; letter-spacing: .3px; color: #fff; background: #00c2e8; border-radius: 4px; padding: 1px 4px; vertical-align: 1px; }
 .kcard.dish .krow .v .hl { font-size: 18px; font-weight: 800; color: var(--accent); background: var(--accent-soft); padding: 4px 9px; border-radius: 8px; }
 .kcard.dish .krow .v { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Donja akcijska traka: glavne radnje ekrana (Dodaj catering, Slikaj račun) */
+.fab-bar { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; z-index: 40; max-width: calc(100% - 24px); }
+.fab { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 24px; background: var(--card); color: var(--accent); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); white-space: nowrap; }
+.fab.primary { background: var(--accent); color: var(--accent-ink); }
+.fab svg { width: 20px; height: 20px; }
+.fab:active { transform: scale(.97); }
+body.has-fab main { padding-bottom: 92px; }
+body.has-fab .toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+.spinner { width: 28px; height: 28px; margin: 0 auto 12px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Pregled računa */
+.rlines { display: grid; gap: 10px; }
+.rline { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; }
+.rline.off .rbody { display: none; }
+.rline.off .rname { opacity: .5; text-decoration: line-through; }
+.rline .rtop { display: flex; align-items: center; gap: 12px; padding: 0; color: var(--ink); font-size: 16px; font-weight: 700; cursor: pointer; }
+.rline .rtop > * { margin-left: 0; }
+.rline .rname { flex: 1; min-width: 0; }
+.rline .rname small { display: block; margin-top: 2px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.rline .rbody { display: grid; gap: 8px; margin-top: 10px; }
+.rline .rbody label { padding-left: 0; }

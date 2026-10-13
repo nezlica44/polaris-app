@@ -61,6 +61,7 @@ const ICON = {
 // znakovi sala: Polaris (sazviježđe iz print kita), Zona 7 (znak 7Z s bannera), Sala Luma (sunce iz loga)
 ICON.polaris = '<svg viewBox="0 0 13.69 22.49"><path d="M7.09 7 L6.81 7.37 M5.86 9.08 L5.33 10.49 M4.84 12.39 L4.61 14 M3.71 15.6 L2.57 16.54 M2.03 18.23 L2.48 19.85 M3.5 20.16 L4.78 19.08 M5.25 17.5 L4.77 15.92" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"></path><path d="M8.32 5.48 L12.69 5.36 L8.32 5.25 Z" fill="currentColor"></path><path d="M8.21 5.36 L8.32 9.73 L8.43 5.36 Z" fill="currentColor"></path><path d="M8.32 5.25 L3.96 5.36 L8.32 5.48 Z" fill="currentColor"></path><path d="M8.43 5.36 L8.32 1 L8.21 5.36 Z" fill="currentColor"></path><path d="M8.32 3.61 L8.64 5.05 L10.07 5.36 L8.64 5.68 L8.32 7.12 L8 5.68 L6.57 5.36 L8 5.05 Z" fill="currentColor"></path><path d="M8.32 4.7 L8.45 5.24 L8.99 5.36 L8.45 5.49 L8.32 6.03 L8.19 5.49 L7.65 5.36 L8.19 5.24 Z" fill="currentColor"></path><path d="M6.21 7.47 L6.34 8.03 L6.9 8.15 L6.34 8.28 L6.21 8.84 L6.09 8.28 L5.53 8.15 L6.09 8.03 Z" fill="currentColor"></path><path d="M4.97 10.72 L5.1 11.28 L5.66 11.41 L5.1 11.53 L4.97 12.1 L4.85 11.53 L4.29 11.41 L4.85 11.28 Z" fill="currentColor"></path><path d="M4.48 14.29 L4.6 14.85 L5.17 14.97 L4.6 15.1 L4.48 15.66 L4.35 15.1 L3.79 14.97 L4.35 14.85 Z" fill="currentColor"></path><path d="M1.75 16.46 L1.89 17.07 L2.5 17.21 L1.89 17.34 L1.75 17.96 L1.61 17.34 L1 17.21 L1.61 17.07 Z" fill="currentColor"></path><path d="M2.74 20.12 L2.87 20.68 L3.43 20.8 L2.87 20.93 L2.74 21.49 L2.62 20.93 L2.05 20.8 L2.62 20.68 Z" fill="currentColor"></path><path d="M5.53 17.76 L5.66 18.32 L6.22 18.45 L5.66 18.57 L5.53 19.13 L5.41 18.57 L4.84 18.45 L5.41 18.32 Z" fill="currentColor"></path></svg>';
 ICON.z7 = '<svg viewBox="-96 30 830 830" fill="currentColor"><path d="M48 180H430L48 840V719L319 250H48Z"/><path d="M590 50V175L319 650H590V715H210Z"/></svg>';
+ICON.camera = svg('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>');
 ICON.sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5.5 15.5a6.5 6.5 0 0 1 13 0"/><path d="M20.6 15.5L23.4 15.5M19.4 11.2L21.0 10.3M16.3 8.1L17.7 5.6M12.0 6.9L12.0 5.1M7.7 8.1L6.3 5.6M4.6 11.2L3.0 10.3M3.4 15.5L0.6 15.5M3 18.5h18"/></svg>';
 const LOGO = '<img src="polaris-logo.png" alt="Polaris" class="logo" onerror="this.remove()">';
 const NEROTTA = '<img src="nerotta.svg" alt="Nerotta" class="logo" onerror="this.remove()">';
@@ -88,16 +89,20 @@ async function q(promise) {
   return data;
 }
 
-function screen({ title, back, action, right = '', body, hideTitle }) {
+// action/actionLabel: jedna glavna radnja; actions: [{ label, go | scan (id dobavljača ili ''), back, icon, primary }]
+// Glavne radnje su u donjoj akcijskoj traci (sredina ekrana), samo na ekranu kojem pripadaju.
+function screen({ title, back, action, actionLabel, actions, right = '', body, hideTitle }) {
+  const bar = actions || (action ? [{ go: action, label: actionLabel || 'Dodaj', icon: 'plus', primary: true }] : null);
   app.innerHTML = `
     <header class="top">
       ${back ? `<button class="backbtn" data-back="${esc(back)}">${ICON.back}Natrag</button>` : ''}
       <span class="spacer"></span>
       ${right}
-      ${action ? `<button class="roundbtn tap" data-go="${esc(action)}" aria-label="Dodaj">${ICON.plus}</button>` : ''}
     </header>
     ${hideTitle ? '' : `<h1 class="large">${esc(title)}</h1>`}
-    <main>${body}</main>`;
+    <main>${body}</main>
+    ${bar ? `<div class="fab-bar noprint">${bar.map((b) => `<button class="fab tap ${b.primary ? 'primary' : ''}"${b.go ? ` data-go="${esc(b.go)}"` : ''}${b.scan != null ? ` data-scan="${esc(b.scan)}" data-scan-back="${esc(b.back || '')}"` : ''}${b.id ? ` id="${b.id}"` : ''}>${b.icon ? ICON[b.icon] : ''}<span>${esc(b.label)}</span></button>`).join('')}</div>` : ''}`;
+  document.body.classList.toggle('has-fab', !!bar);
   document.title = title ? `${title} · Polaris` : 'Polaris';
   if (!liveSilent) window.scrollTo(0, 0);
 }
@@ -120,6 +125,8 @@ const menuBtn = (path, icon, color, name, sub) => `
   </button>`;
 
 document.addEventListener('click', (e) => {
+  const sc = e.target.closest('[data-scan]');
+  if (sc) { scanReceipt({ supplierId: sc.dataset.scan || null, back: sc.dataset.scanBack || null }); return; }
   const b = e.target.closest('[data-back]');
   if (b) { go(b.dataset.back); return; }
   const g = e.target.closest('[data-go]');
@@ -129,6 +136,7 @@ document.addEventListener('click', (e) => {
 /* ---------- prijava ---------- */
 function renderLogin() {
   document.title = 'Polaris';
+  document.body.classList.remove('has-fab');
   app.innerHTML = `
     <div class="login">
       <div class="login-hero">${LOGO}<div class="brand-sub">Interna aplikacija</div></div>
@@ -839,7 +847,7 @@ async function renderVenueList(venue) {
     };
     const draw = () => {
       screen({
-        title: V.name, back: '/kalendar', action: `${V.path}/new`,
+        title: V.name, back: '/kalendar', action: `${V.path}/new`, actionLabel: V.add,
         right: `<button class="roundbtn plain tap" id="view" aria-label="${viewMode === 'list' ? 'Kalendar' : 'Popis'}">${viewMode === 'list' ? ICON.calendar : ICON.list}</button>`,
         body: viewMode === 'cal' ? '<div id="cal"></div>' : `
           <div class="seg ${cateringTab === 'past' ? 'right' : ''}">
@@ -1473,17 +1481,20 @@ const pickLabel = (t) => `<div style="font-size:13px;font-weight:600;color:var(-
 async function renderNabavka() {
   loading('Nabavka', '/restoran');
   try {
-    const [sups, items] = await Promise.all([q(sb.from('suppliers').select('id, categories')), q(sb.from('items').select('category'))]);
+    const [sups, items, pending] = await Promise.all([q(sb.from('suppliers').select('id, categories')), q(sb.from('items').select('category')), sb.from('receipts').select('id', { count: 'exact', head: true }).eq('status', 'pending').then((r) => r.count || 0, () => 0)]);
     const sub = (k) => {
       const s = sups.filter((x) => (x.categories || []).includes(k)).length;
       const i = items.filter((x) => x.category === k).length;
       return `${NCATS[k].sub} · ${s} ${plural(s, 'dobavljač', 'dobavljača', 'dobavljača')} · ${i} ${plural(i, 'artikl', 'artikla', 'artikala')}`;
     };
     screen({
-      title: 'Nabavka', back: '/restoran', action: '/dobavljac/new',
+      title: 'Nabavka', back: '/restoran', action: '/dobavljac/new', actionLabel: 'Dodaj dobavljača',
       body: `
         <div class="menu">${Object.entries(NCATS).map(([k, c]) => menuBtn(`/nabavka/${k}`, c.icon, c.color, c.name, sub(k))).join('')}</div>
-        <div class="actions"><button class="btn secondary tap" data-go="/artikli">Svi artikli i cijene</button></div>`,
+        <div class="actions">
+          <button class="btn secondary tap" data-go="/racuni">Slikani računi${pending ? ` · <b>${pending} za potvrdu</b>` : ''}</button>
+          <button class="btn secondary tap" data-go="/artikli">Svi artikli i cijene</button>
+        </div>`,
     });
   } catch (e) { failed('Nabavka', '/restoran', e); }
 }
@@ -1494,7 +1505,7 @@ async function renderNabCategory(cat) {
   try {
     const rows = await q(sb.from('suppliers').select('id, name, items(category)').contains('categories', [cat]).order('name'));
     screen({
-      title: C.name, back: '/nabavka', action: `/dobavljac/new?c=${cat}`,
+      title: C.name, back: '/nabavka', action: `/dobavljac/new?c=${cat}`, actionLabel: 'Dodaj dobavljača',
       body: `
         <div class="section-title">Dobavljači</div>
         ${rows.length ? `<div class="group">${rows.map((s) => {
@@ -1527,7 +1538,8 @@ async function renderSupplier(id, cat) {
     const s = await q(sb.from('suppliers').select('*, items(*)').eq('id', id).single());
     const items = (s.items || []).filter((i) => !cat || i.category === cat).sort((a, b) => a.name.localeCompare(b.name, 'hr'));
     screen({
-      title: s.name, back, action: `/artikl/new?s=${s.id}${cat ? `&c=${cat}` : ''}`,
+      title: s.name, back,
+      actions: [{ scan: s.id, back: `/nabavka/${cat || (s.categories || [])[0] || 'food'}/${s.id}`, label: 'Slikaj račun', icon: 'camera', primary: true }, { go: `/artikl/new?s=${s.id}${cat ? `&c=${cat}` : ''}`, label: 'Dodaj artikl', icon: 'plus' }],
       body: `
         ${s.contact || s.note ? `<div class="detail" style="margin-bottom:6px">
           ${s.contact ? `<div class="item"><div class="label">Kontakt</div><div class="value">${esc(s.contact)}</div></div>` : ''}
@@ -1643,6 +1655,180 @@ async function renderItemForm(id, supplierId, cat) {
   };
 }
 
+/* ---------- SLIKAJ RAČUN: slika -> AI pročita stavke -> pregled "je li sve u redu?" -> potvrda mijenja cijene ---------- */
+let rDraft = null; // pročitani račun u pregledu; ništa nije spremljeno dok se ne potvrdi
+// slika s kamere smanjena na max px (duža stranica) i JPEG, base64 bez prefiksa
+async function shrinkImage(file, max = 1600, quality = 0.82) {
+  const img = await createImageBitmap(file).catch(() => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Sliku ne mogu otvoriti.')); i.src = URL.createObjectURL(file); }));
+  const w = img.width, h = img.height, s = Math.min(1, max / Math.max(w, h));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality).split(',')[1];
+}
+async function fnErrText(e) {
+  try { if (e?.context?.json) { const j = await e.context.json(); if (j?.message || j?.error) return j.message || j.error; } } catch { /* nema JSON-a */ }
+  return errText(e);
+}
+function scanReceipt({ supplierId = null, back = null } = {}) {
+  const from = back || location.hash.slice(1) || '/';
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.hidden = true;
+  document.body.appendChild(inp);
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0]; inp.remove();
+    if (!file) return;
+    renderSeq++;
+    screen({ title: 'Čitam račun…', back: from, body: '<div class="empty"><div class="spinner"></div>Čitam stavke s računa, pričekaj par sekundi.</div>' });
+    try {
+      const image = await shrinkImage(file);
+      const { data, error } = await sb.functions.invoke('scan-receipt', { body: { image, mime: 'image/jpeg', supplier_id: supplierId } });
+      if (error) throw error;
+      if (data?.error === 'no_key') throw new Error(data.message || 'Ključ za čitanje računa nije postavljen.');
+      if (!(data?.lines || []).length) throw new Error(data?.error && data.error !== 'ai_failed' ? `Nisam pročitao stavke: ${data.error}` : 'Na slici nisam našao stavke. Slikaj račun ravno i s dovoljno svjetla.');
+      rDraft = { supplier_id: supplierId, store: data.store, date: data.date, total: data.total, lines: data.lines, back: from };
+      go('/racun/pregled');
+    } catch (e) {
+      screen({ title: 'Račun', back: from, body: `<div class="empty">${esc(await fnErrText(e))}</div><div class="actions"><button class="btn secondary tap" data-back="${esc(from)}">Natrag</button></div>` });
+    }
+  };
+  inp.click();
+}
+// redak za pregled: što je na računu, kojem artiklu pripada (ili novi), nova cijena bez PDV-a po jedinici
+const reviewLine = (l) => {
+  const m = l.match || null;
+  const per = l.per || null;
+  const unit = m ? m.unit : (per ? per.unit : l.unit);
+  let price = l.price_net;
+  if (per && per.unit === unit) price = per.price_net; else if (l.unit !== unit && per) price = per.price_net;
+  return { ...l, include: true, item_id: m ? m.item_id : '', new_name: m ? m.item_name : l.name, new_unit: unit, new_price: price != null ? +Number(price).toFixed(4) : null, new_vat: l.vat_rate_used ?? l.vat_rate ?? 25, old_price: m ? m.price_net : null, old_unit: m ? m.unit : null };
+};
+async function renderReceiptReview(id) {
+  const admin = isAdmin();
+  const back = rDraft?.back || (admin ? '/racuni' : '/');
+  const my = loading('Pregled računa', back);
+  try {
+    let r = null;
+    if (id) { r = await q(sb.from('receipts').select('*, scanner:profiles!receipts_scanned_by_fkey(full_name)').eq('id', id).single()); }
+    else if (rDraft) r = { ...rDraft, status: 'new' };
+    if (!r) return go(back);
+    const [items, sups] = admin ? await Promise.all([q(sb.from('items').select('id, name, unit, price_net, supplier_id').order('name')), q(sb.from('suppliers').select('id, name, categories').order('name'))]) : [[], []];
+    if (stale(my)) return;
+    const lines = (r.lines || []).map((l) => (l.new_name !== undefined ? l : reviewLine(l)));
+    const readOnly = r.status === 'applied' || r.status === 'rejected';
+    const byStore = sups.find((s) => r.store && norm(r.store).includes(norm(s.name)));
+    let supplierId = r.supplier_id || byStore?.id || '';
+    const supOpt = sups.map((s) => `<option value="${s.id}" ${s.id === supplierId ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+    const itemOpt = (sel) => `<option value="">Novi artikl</option>${items.map((i) => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.price_net != null ? ` · ${eur(i.price_net)}/${esc(i.unit)}` : ''}</option>`).join('')}`;
+    const onReceipt = (l) => [l.qty != null && `${num(l.qty, l.unit === 'kg' || l.unit === 'l' ? 3 : 0)} ${l.unit}`, l.unit_price_gross != null && `× ${eur(l.unit_price_gross)}`, l.pack && `(${num(l.pack.size, 2)} ${l.pack.unit})`, l.total != null && `= ${eur(l.total)}`, `PDV ${l.new_vat} %`].filter(Boolean).join(' ');
+    const row = (l, i) => `
+      <div class="rline ${l.include ? '' : 'off'}" data-i="${i}">
+        <label class="rtop"><input type="checkbox" class="sw" name="inc_${i}" ${l.include ? 'checked' : ''} ${readOnly ? 'disabled' : ''}><span class="rname">${esc(l.name)}<small>${esc(onReceipt(l))}</small></span></label>
+        <div class="rbody">
+          ${admin && !readOnly ? `<label>Artikl u Nabavci<select name="item_${i}">${itemOpt(l.item_id)}</select></label>` : `<div class="muted small">${l.item_id ? `Postojeći artikl: ${esc(l.new_name)}` : 'Novi artikl'}</div>`}
+          <label ${l.item_id ? 'hidden' : ''} data-newname>Naziv novog artikla<input name="name_${i}" value="${esc(l.new_name)}" ${readOnly ? 'disabled' : ''}></label>
+          <div class="grid2">
+            <label>Cijena bez PDV-a (€)<input name="price_${i}" inputmode="decimal" value="${l.new_price != null ? esc(num(l.new_price, 4).replace(/0+$/, '').replace(/[.,]$/, '')) : ''}" ${readOnly ? 'disabled' : ''}></label>
+            <label>Po jedinici<select name="unit_${i}" ${readOnly ? 'disabled' : ''}>${unitOptions(l.new_unit)}</select></label>
+          </div>
+          <label>PDV<select name="vat_${i}" ${readOnly ? 'disabled' : ''}>${[25, 13, 5, 0].map((v) => `<option value="${v}" ${Number(l.new_vat) === v ? 'selected' : ''}>${v}%</option>`).join('')}</select></label>
+          ${l.item_id && l.old_price != null ? `<div class="muted small">Dosad ${eur(l.old_price)}/${esc(l.old_unit)}${l.new_price != null && l.new_unit === l.old_unit && eur(l.new_price) !== eur(l.old_price) ? ` → ${eur(l.new_price)}/${esc(l.new_unit)} (${l.new_price > l.old_price ? '+' : ''}${num(((l.new_price - l.old_price) / l.old_price) * 100, 0)} %)` : l.new_price != null && l.new_unit === l.old_unit ? ' (ista cijena)' : ''}</div>` : ''}
+        </div>
+      </div>`;
+    screen({
+      title: readOnly ? (r.status === 'applied' ? 'Račun primijenjen' : 'Račun odbačen') : 'Je li sve u redu?', back,
+      body: `
+        <form id="f" novalidate>
+          <div class="hero">
+            <div class="bigdate">${esc(r.store || 'Račun')}</div>
+            <div class="muted">${[r.receipt_date || r.date ? fmtDateShort(r.receipt_date || r.date) : '', r.total != null ? `ukupno ${eur(r.total)}` : '', r.scanner?.full_name ? `slikao ${esc(r.scanner.full_name)}` : '', r.created_at ? fmtStamp(r.created_at) : ''].filter(Boolean).join(' · ')}</div>
+            ${admin && !readOnly ? `<label style="margin-top:12px">Dobavljač za nove artikle<select id="sup"><option value="">— odaberi —</option>${supOpt}</select></label>` : ''}
+            ${!admin ? '<p class="muted small" style="margin:10px 0 0">Provjeri stavke i cijene pa pošalji adminu. Cijene se mijenjaju tek kad admin potvrdi.</p>' : ''}
+          </div>
+          <div class="section-title">Stavke s računa · ${lines.length}</div>
+          <div class="rlines">${lines.map(row).join('')}</div>
+          <div class="err" id="err"></div>
+          ${readOnly ? '' : `<div class="actions">
+            <button class="btn tap" type="submit" id="ok">${admin ? 'Potvrdi i ažuriraj cijene' : 'Pošalji adminu na potvrdu'}</button>
+            ${id && admin ? '<button class="btn danger" type="button" id="rej">Odbaci račun</button>' : `<button class="btn secondary tap" type="button" data-back="${esc(back)}">Odustani</button>`}
+          </div>`}
+        </form>`,
+    });
+    const f = document.getElementById('f');
+    f.addEventListener('change', (e) => {
+      const t = e.target; const box = t.closest('.rline'); if (!box) return;
+      if (t.name.startsWith('inc_')) box.classList.toggle('off', !t.checked);
+      if (t.name.startsWith('item_')) { const nn = box.querySelector('[data-newname]'); nn.hidden = !!t.value; }
+    });
+    const collect = () => lines.map((l, i) => {
+      const inc = f.elements[`inc_${i}`].checked;
+      const item_id = admin ? f.elements[`item_${i}`].value : l.item_id;
+      const price = numVal(f, `price_${i}`);
+      return { ...l, include: inc, item_id, new_name: val(f, `name_${i}`) || l.new_name, new_price: price, new_unit: val(f, `unit_${i}`) || l.new_unit, new_vat: Number(val(f, `vat_${i}`)) };
+    });
+    const compact = (ls) => ls.map(({ name, qty, unit, unit_price_gross, total, pack, vat_rate_used, price_net, per, match, include, item_id, new_name, new_price, new_unit, new_vat }) => ({ name, qty, unit, unit_price_gross, total, pack, vat_rate_used, price_net, per, match, include, item_id, new_name, new_price, new_unit, new_vat }));
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err'); err.textContent = '';
+      const ls = collect();
+      const use = ls.filter((l) => l.include);
+      if (!use.length) { err.textContent = 'Nijedna stavka nije uključena.'; return; }
+      const bad = use.find((l) => l.new_price == null || isNaN(l.new_price) || l.new_price < 0);
+      if (bad) { err.textContent = `Upiši cijenu za: ${bad.name}`; return; }
+      const sup = admin ? document.getElementById('sup').value : null;
+      if (admin && use.some((l) => !l.item_id) && !sup) { err.textContent = 'Odaberi dobavljača za nove artikle.'; return; }
+      const btn = document.getElementById('ok'); btn.disabled = true;
+      try {
+        const head = { supplier_id: sup || r.supplier_id || null, store: r.store || null, receipt_date: r.receipt_date || r.date || null, total: r.total ?? null, lines: compact(ls) };
+        if (!admin) {
+          await q(sb.from('receipts').insert({ ...head, status: 'pending' }));
+          rDraft = null; flushPush(); toast('Poslano adminu na potvrdu'); go('/'); return;
+        }
+        let upd = 0, ins = 0;
+        const supRow = sups.find((s) => s.id === sup);
+        for (const l of use) {
+          if (l.item_id) { await q(sb.from('items').update({ price_net: l.new_price, vat_rate: l.new_vat, unit: l.new_unit, updated_at: new Date().toISOString() }).eq('id', l.item_id)); upd++; }
+          else { await q(sb.from('items').insert({ name: l.new_name, supplier_id: sup, category: (supRow?.categories || [])[0] || 'food', unit: l.new_unit, price_net: l.new_price, vat_rate: l.new_vat })); ins++; }
+        }
+        const done = { ...head, status: 'applied', applied_at: new Date().toISOString(), applied_by: me.id };
+        if (id) await q(sb.from('receipts').update(done).eq('id', id)); else await q(sb.from('receipts').insert(done));
+        rDraft = null;
+        toast(`Ažurirano ${upd} ${plural(upd, 'cijena', 'cijene', 'cijena')}, dodano ${ins} ${plural(ins, 'artikl', 'artikla', 'artikala')}`);
+        go(id ? '/racuni' : back);
+      } catch (e2) { err.textContent = errText(e2); btn.disabled = false; }
+    };
+    const rej = document.getElementById('rej');
+    if (rej) rej.onclick = async () => {
+      if (!confirm('Odbaciti ovaj račun? Cijene se neće mijenjati.')) return;
+      try { await q(sb.from('receipts').update({ status: 'rejected', applied_at: new Date().toISOString(), applied_by: me.id }).eq('id', id)); toast('Odbačeno'); go('/racuni'); } catch (e2) { toast(errText(e2)); }
+    };
+  } catch (e) { if (!stale(my)) failed('Pregled računa', back, e); }
+}
+async function renderReceipts() {
+  const my = loading('Slikani računi', '/nabavka');
+  try {
+    const rows = await q(sb.from('receipts').select('id, store, receipt_date, total, status, created_at, lines, scanner:profiles!receipts_scanned_by_fkey(full_name), supplier:suppliers(name)').order('created_at', { ascending: false }).limit(60));
+    if (stale(my)) return;
+    const cell = (r) => `
+      <button class="cell" data-go="/racuni/${r.id}">
+        <span class="main">
+          <span class="title one" style="display:block">${esc(r.store || r.supplier?.name || 'Račun')}</span>
+          <span class="meta">${[r.receipt_date ? fmtDateShort(r.receipt_date) : fmtStamp(r.created_at), `${(r.lines || []).length} stavki`, r.total != null ? eur(r.total) : '', r.scanner?.full_name].filter(Boolean).join(' · ')}</span>
+        </span>
+        <span class="${r.status === 'pending' ? 'overdue' : 'muted'} nowrap">${r.status === 'pending' ? 'za potvrdu' : r.status === 'applied' ? 'primijenjen' : 'odbačen'}</span>
+        <span class="chev">${ICON.chev}</span>
+      </button>`;
+    const pend = rows.filter((r) => r.status === 'pending'), rest = rows.filter((r) => r.status !== 'pending');
+    screen({
+      title: 'Slikani računi', back: '/nabavka',
+      actions: [{ scan: '', back: '/racuni', label: 'Slikaj račun', icon: 'camera', primary: true }],
+      body: `
+        ${pend.length ? `<div class="section-title">Za potvrdu</div><div class="group">${pend.map(cell).join('')}</div>` : ''}
+        <div class="section-title">Obrađeni</div>
+        ${rest.length ? `<div class="group">${rest.map(cell).join('')}</div>` : '<div class="empty">Još nema slikanih računa.<br>Slikaj račun u dobavljaču ili ovdje.</div>'}`,
+    });
+  } catch (e) { if (!stale(my)) failed('Slikani računi', '/nabavka', e); }
+}
+
 /* ---------- JELOVNIK: normativ, recept, food cost ---------- */
 const BASE = { kg: ['kg', 1], g: ['kg', 0.001], l: ['l', 1], ml: ['l', 0.001], kom: ['kom', 1], pak: ['pak', 1] };
 function lineCost(ing) {
@@ -1692,7 +1878,7 @@ async function renderMenuList(delivery) {
         <div class="section-title">${esc(cat)}</div>
         <div class="group mtable">${head}${ds.map(row).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan.'}</div>${delivery ? '' : '<div class="actions"><button class="btn tap" data-go="/jelovnik/skeniraj">Učitaj jelovnik iz PDF-a</button></div>'}`}
       ${list.length ? `<p class="muted small" style="margin:16px 4px">Food cost = nabavna cijena sastojaka bez PDV-a. Koeficijent = cijena bez PDV-a (${VAT_FOOD} %) / food cost, cilj iznad 3x.</p>` : ''}`;
-    screen({ title: delivery ? 'Jelovnik - Dostava' : 'Jelovnik', back: '/restoran', action: '/jelo/new', body });
+    screen({ title: delivery ? 'Jelovnik - Dostava' : 'Jelovnik', back: '/restoran', action: '/jelo/new', actionLabel: 'Dodaj jelo', body });
   } catch (e) { failed(title, '/restoran', e); }
 }
 
@@ -2112,7 +2298,8 @@ async function renderTodo() {
       </div>`;
     const groupOf = (arr) => `<div class="group">${arr.map(card).join('<div class="sep"></div>')}</div>`;
     screen({
-      title, back, action: admin ? '/todo/new' : null,
+      title, back, action: admin ? '/todo/new' : null, actionLabel: 'Novi zadatak',
+      actions: admin ? null : [{ scan: '', back: '/', label: 'Slikaj račun', icon: 'camera', primary: true }],
       body: `
         ${admin ? `<select id="pf" style="margin-bottom:6px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : `<p class="muted" style="margin:-6px 4px 6px">Bok, ${esc(me.full_name)}</p><div id="pushask"></div>`}
         <div class="section-title">Za napraviti</div>
@@ -2204,7 +2391,7 @@ async function renderUsers() {
   try {
     const rows = await q(sb.from('profiles').select('*').order('full_name'));
     screen({
-      title: 'Korisnici', back: '/admin', action: '/korisnici/new',
+      title: 'Korisnici', back: '/admin', action: '/korisnici/new', actionLabel: 'Dodaj korisnika',
       body: `<div class="group">${rows.map((u) => `
         <button class="cell" data-go="/korisnici/${u.id}" style="${u.active ? '' : 'opacity:.5'}">
           <span class="main"><span class="title one" style="display:block">${esc(u.full_name)}</span><span class="meta">@${esc(u.username)}${u.active ? '' : ' · neaktivan'}</span></span>
@@ -2305,7 +2492,7 @@ async function route() {
   try { return await dispatch(p, params); } finally { routeBusy = false; if (livePending) liveSoon(); }
 }
 async function dispatch(p, params) {
-  if (!isAdmin() && !['', 'pin', 'obavijesti'].includes(p[0] || '')) return renderTodo();
+  if (!isAdmin() && !['', 'pin', 'obavijesti', 'racun'].includes(p[0] || '')) return renderTodo();
   if (!isSuper() && ['admin', 'radnje', 'korisnici'].includes(p[0])) return renderHome();
   switch (p[0]) {
     case undefined: return renderHome();
@@ -2334,6 +2521,8 @@ async function dispatch(p, params) {
       if (!NCATS[p[1]]) return renderSupplier(p[1]); // stara poveznica bez kategorije
       return p[2] ? renderSupplier(p[2], p[1]) : renderNabCategory(p[1]);
     case 'artikli': return renderAllItems();
+    case 'racun': return renderReceiptReview(null);
+    case 'racuni': return p[1] ? renderReceiptReview(p[1]) : renderReceipts();
     case 'dobavljac': return renderSupplierForm(p[1] === 'new' ? null : p[1], NCATS[params.get('c')] ? params.get('c') : null);
     case 'artikl': return p[1] === 'new' ? renderItemForm(null, params.get('s'), NCATS[params.get('c')] ? params.get('c') : null) : renderItemForm(p[1]);
     case 'jelo':
