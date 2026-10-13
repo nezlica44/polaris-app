@@ -472,3 +472,19 @@ a.btn { display: flex; align-items: center; justify-content: center; text-decora
   header.top, h1.large, .actions, .noprint, .toast { display: none !important; }
   .kitchen { padding: 0; }
 }
+
+/* Jelovnik: tablica jelo / food cost / cijena; jelo: jedna tablica s normativom, cijenom i zaradom */
+.mtable .mrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.mtable .mrow + .mrow { border-top: 1px solid var(--line); }
+.mtable .mrow:active { background: var(--fill); }
+.mtable .mrow.head { padding: 8px 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); cursor: default; }
+.mtable .mrow.head .mfc, .mtable .mrow.head .mp { font-size: 11px; color: var(--muted); display: block; }
+.mtable .mn { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.mtable .mfc { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 62px; text-align: right; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.mtable .mfc small { font-size: 11px; color: var(--danger); }
+.mtable .mp { display: inline-flex; flex-direction: column; align-items: flex-end; min-width: 64px; text-align: right; }
+.mtable .mp b { font-size: 17px; font-weight: 800; color: var(--accent); background: var(--accent-soft); padding: 4px 8px; border-radius: 8px; white-space: nowrap; }
+.mtable .mp small { margin-top: 4px; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.wolt { font-style: normal; font-weight: 800; font-size: 9px; letter-spacing: .3px; color: #fff; background: #00c2e8; border-radius: 4px; padding: 1px 4px; vertical-align: 1px; }
+.kcard.dish .krow .v .hl { font-size: 18px; font-weight: 800; color: var(--accent); background: var(--accent-soft); padding: 4px 9px; border-radius: 8px; }
+.kcard.dish .krow .v { display: inline-flex; align-items: center; gap: 6px; }

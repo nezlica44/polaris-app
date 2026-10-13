@@ -1454,8 +1454,7 @@ function renderRestoranMenu() {
   screen({
     title: 'Polaris', back: '/',
     body: `<div class="menu">
-      ${menuBtn('/jelovnik', 'book', 'green', 'Jelovnik', 'Normativi, recepti, food cost')}
-      ${menuBtn('/dostava', 'bike', 'green', 'Jelovnik - Dostava', 'Cijene za Wolt i sl.')}
+      ${menuBtn('/jelovnik', 'book', 'green', 'Jelovnik', 'Cijene, food cost, Wolt')}
       ${menuBtn('/normativ', 'scale', 'green', 'Normativ', 'Sastojci i food cost svih jela')}
       ${menuBtn('/nabavka', 'cart', 'green', 'Nabavka', 'Food, Drink, Chemical')}
     </div>`,
@@ -1658,7 +1657,7 @@ function dishCost(d) {
   if (!ings.length) return { cost: null, missing: 0 };
   let cost = 0, missing = 0;
   for (const g of ings) { const c = lineCost(g); if (c == null) missing++; else cost += c; }
-  return { cost, missing };
+  return { cost: missing === ings.length ? null : cost, missing }; // nijedan sastojak nema cijenu -> food cost nepoznat
 }
 function factorBadge(priceGross, vat, cost) {
   if (!priceGross || !cost) return '';
@@ -1667,6 +1666,8 @@ function factorBadge(priceGross, vat, cost) {
   return `<span class="badge ${f >= 3 ? 'good' : 'bad'}">${num(f, 2)}x</span>`;
 }
 
+const VAT_FOOD = 13; // izlazni PDV na hranu u restoranu
+// Jelovnik: jedna tablica po kategoriji: jelo · food cost s koeficijentom · cijena (istaknuta), ispod cijene mala Wolt cijena
 async function renderMenuList(delivery) {
   const title = delivery ? 'Dostava' : 'Jelovnik';
   loading(title, '/restoran');
@@ -1675,21 +1676,22 @@ async function renderMenuList(delivery) {
     const list = delivery ? rows.filter((d) => d.on_delivery) : rows;
     const groups = {};
     list.forEach((d) => { (groups[d.category || 'Ostalo'] ||= []).push(d); });
+    const row = (d) => {
+      const { cost, missing } = dishCost(d);
+      const price = delivery ? d.delivery_price : d.price;
+      return `
+        <button class="mrow tap" data-go="/jelo/${d.id}">
+          <span class="mn">${esc(d.name)}</span>
+          <span class="mfc">${cost != null ? `<span>${eur(cost)}</span>${factorBadge(price, d.vat_rate, cost)}` : '<span class="muted">—</span>'}${missing ? `<small>${missing} bez cijene</small>` : ''}</span>
+          <span class="mp"><b>${price != null ? eur(price) : '—'}</b>${!delivery && d.on_delivery && d.delivery_price != null ? `<small><i class="wolt">Wolt</i>${eur(d.delivery_price)}</small>` : ''}</span>
+        </button>`;
+    };
+    const head = '<div class="mrow head"><span>Jelo</span><span class="mfc">Food cost</span><span class="mp">Cijena</span></div>';
     const body = `
       ${list.length ? Object.entries(groups).map(([cat, ds]) => `
         <div class="section-title">${esc(cat)}</div>
-        <div class="group">${ds.map((d) => {
-          const { cost, missing } = dishCost(d);
-          const price = delivery ? d.delivery_price : d.price;
-          return `
-          <button class="cell" data-go="/jelo/${d.id}">
-            <span class="main">
-              <span class="price-row"><span class="title one">${esc(d.name)}</span><span class="p">${eur(price)}</span></span>
-              <span class="meta price-row"><span class="one">Food cost ${cost != null ? eur(cost) : '—'}${missing ? ` · ${missing} bez cijene` : ''}</span>${factorBadge(price, d.vat_rate, cost)}</span>
-            </span>
-          </button>`;
-        }).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan.'}</div>${delivery ? '' : `<div class="actions"><button class="btn tap" data-go="/jelovnik/skeniraj">Učitaj jelovnik iz PDF-a</button><p class="muted small center" style="margin:4px 0 0">Aplikacija sama upiše jela, kategorije i cijene iz PDF-a. Ili dodaj jelo ručno na +.</p></div>`}`}
-      ${list.length ? '<p class="muted small" style="margin:16px 4px">Faktor = prodajna cijena bez PDV-a / nabavna cijena sastojaka. Cilj je iznad 3x.</p>' : ''}`;
+        <div class="group mtable">${head}${ds.map(row).join('')}</div>`).join('') : `<div class="empty">${delivery ? 'Nijedno jelo nije na dostavi.<br>Otvori jelo i uključi „Na dostavi”.' : 'Jelovnik je prazan.'}</div>${delivery ? '' : '<div class="actions"><button class="btn tap" data-go="/jelovnik/skeniraj">Učitaj jelovnik iz PDF-a</button></div>'}`}
+      ${list.length ? `<p class="muted small" style="margin:16px 4px">Food cost = nabavna cijena sastojaka bez PDV-a. Koeficijent = cijena bez PDV-a (${VAT_FOOD} %) / food cost, cilj iznad 3x.</p>` : ''}`;
     screen({ title: delivery ? 'Jelovnik - Dostava' : 'Jelovnik', back: '/restoran', action: '/jelo/new', body });
   } catch (e) { failed(title, '/restoran', e); }
 }
@@ -1701,24 +1703,29 @@ async function renderDish(id, from) {
     const d = await q(sb.from('dishes').select('*, dish_ingredients(*, items(name, price_net, unit, suppliers(name)))').eq('id', id).single());
     const ings = (d.dish_ingredients || []).sort((a, b) => a.sort - b.sort);
     const { cost, missing } = dishCost(d);
-    const priceLine = (label, p) => `<div class="price-row" style="margin-top:6px"><span>${label}</span><span class="p">${eur(p)} ${factorBadge(p, d.vat_rate, cost)}</span></div>`;
+    const vat = Number(d.vat_rate ?? VAT_FOOD) || 0;
+    const trow = (label, v, sub = '', cls = '') => `<div class="krow ${cls}"><span>${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span><span class="v">${v}</span></div>`;
+    // cijena s PDV-om, ispod neto; zarada = neto cijena - food cost, koeficijent = neto / food cost
+    const priceRows = (label, p) => {
+      if (p == null) return trow(label, '<span class="muted">nije upisana</span>');
+      const net = p / (1 + vat / 100);
+      return trow(label, `<b class="hl">${eur(p)}</b>`, `bez PDV-a (${num(vat, 0)} %) ${eur(net)}`)
+        + (cost ? trow('Zarada po porciji', `${eur(net - cost)} ${factorBadge(p, vat, cost)}`, `${eur(net)} − food cost ${eur(cost)}`) : '');
+    };
     screen({
       title: d.name, back,
       body: `
-        <div class="hero">
-          <div class="muted small">${esc(d.category || 'Bez kategorije')} · PDV ${num(d.vat_rate ?? 0, 1)}%</div>
-          ${priceLine('Restoran', d.price)}
-          ${d.on_delivery ? priceLine('Dostava', d.delivery_price) : ''}
-          ${d.description ? `<div class="muted small" style="margin-top:10px;white-space:pre-wrap">${esc(d.description)}</div>` : ''}
-        </div>
-        <div class="section-title">Normativ za 1 porciju</div>
-        <div class="group">
+        <div class="kcard dish">
+          <div class="khead"><span>Normativ za 1 porciju</span><span>${esc(d.category || '')}</span></div>
           ${ings.length ? ings.map((g) => {
             const c = lineCost(g);
-            return `<div class="cell static"><span class="main price-row"><span class="one">${esc(g.name)} <span class="muted">· ${num(g.qty, 3)} ${esc(g.unit)}</span></span><span class="nowrap ${c == null ? 'muted' : ''}">${c == null ? 'nema cijene' : eur(c)}</span></span></div>`;
-          }).join('') + `<div class="cell static"><span class="main price-row"><strong>Food cost</strong><strong>${eur(cost)}</strong></span></div>` : '<div class="cell static muted">Normativ nije upisan.</div>'}
+            return trow(esc(g.name), c == null ? '<span class="muted">nema cijene</span>' : eur(c), `${num(g.qty, 3)} ${esc(g.unit)}${g.items?.suppliers?.name ? ` · ${esc(g.items.suppliers.name)}` : ''}`);
+          }).join('') : '<div class="krow"><span class="muted">Normativ nije upisan.</span></div>'}
+          ${trow('Food cost', cost != null ? eur(cost) : '—', missing ? `${missing} ${plural(missing, 'sastojak', 'sastojka', 'sastojaka')} bez cijene` : '', 'total')}
+          ${priceRows('Cijena u restoranu', d.price)}
+          ${d.on_delivery ? priceRows('<i class="wolt">Wolt</i> Cijena na dostavi', d.delivery_price) : ''}
         </div>
-        ${missing ? `<p class="muted small" style="margin:8px 4px 0">${missing} ${plural(missing, 'sastojak nije povezan', 'sastojka nisu povezana', 'sastojaka nije povezano')} s artiklom iz Nabavke ili nema cijenu.</p>` : ''}
+        ${d.description ? `<div class="section-title">Opis</div><div class="detail"><div class="item"><div class="value" style="white-space:pre-wrap">${esc(d.description)}</div></div></div>` : ''}
         <div class="section-title">Recept</div>
         <div class="detail"><div class="item"><div class="value">${d.recipe ? esc(d.recipe) : '<span class="muted">Recept nije upisan.</span>'}</div></div></div>
         <div class="actions"><button class="btn secondary tap" data-go="/jelo/${d.id}/edit">Uredi jelo, normativ i recept</button></div>`,
