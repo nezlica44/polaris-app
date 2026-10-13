@@ -290,6 +290,10 @@ input[type=checkbox] { width: 24px; height: 24px; padding: 0; box-shadow: none; 
 /* Početni ekran: logo Nerotta d.o.o. (tamno siva + zlatna iz loga) */
 .home-hero { background: #353535; flex-direction: row; align-items: center; gap: 18px; padding: 16px 20px; margin: 4px 0 18px; }
 .home-hero .logo { width: auto; height: 96px; }
+/* Zaposlenik: Polaris tema (bijeli Polaris logo na tamnozelenoj kao na prijavi) */
+.home-hero.polaris { background: linear-gradient(145deg, #1f5c45, #123a2b); flex-direction: column; gap: 10px; padding: 22px 20px 18px; }
+.home-hero.polaris .logo { width: 170px; max-width: 70%; height: auto; }
+.home-hero.polaris .hello { font-size: 19px; }
 .home-hero .hello { font-size: 22px; font-weight: 700; }
 .login-hero::after { content: ""; display: block; width: 36px; height: 3px; border-radius: 2px; background: var(--gold); margin-top: 14px; }
 .catpick { display: flex; flex-wrap: wrap; gap: 8px; }

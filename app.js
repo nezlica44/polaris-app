@@ -2717,7 +2717,8 @@ async function renderTodo() {
       title, back, action: admin ? '/todo/new' : null, actionLabel: 'Novi zadatak',
       actions: admin ? null : [{ scan: '', back: '/', label: 'Slikaj račun', icon: 'camera', primary: true }],
       body: `
-        ${admin ? `<select id="pf" style="margin-bottom:6px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : `<p class="muted" style="margin:-6px 4px 6px">Bok, ${esc(me.full_name)}</p><div id="pushask"></div>`}
+        ${admin ? '' : `<div class="home-hero polaris">${LOGO}<div class="hello">Bok, ${esc(me.full_name)}</div></div>`}
+        ${admin ? `<select id="pf" style="margin-bottom:6px"><option value="">Svi zaposlenici</option>${people.map((p) => `<option value="${p.id}" ${p.id === todoFilter ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select>` : '<div id="pushask"></div>'}
         <div class="section-title">Za napraviti</div>
         ${open.length ? groupOf(open) : '<div class="empty">Nema otvorenih zadataka.</div>'}
         ${done.length ? `<div class="section-title">Gotovo</div>${groupOf(done)}` : ''}
@@ -2803,18 +2804,21 @@ async function renderActivity() {
 }
 
 const ROLE = { super_admin: 'Super admin', admin: 'Admin', user: 'Zaposlenik' };
+const TEAMS = { polaris: 'Polaris', martins: 'Martins', ostalo: 'Ostalo' };
+const teamOptions = (sel) => Object.entries(TEAMS).map(([k, n]) => `<option value="${k}" ${k === (sel || 'polaris') ? 'selected' : ''}>${n}</option>`).join('');
 async function renderUsers() {
   loading('Korisnici', '/admin');
   try {
     const rows = await q(sb.from('profiles').select('*').order('full_name'));
-    screen({
-      title: 'Korisnici', back: '/admin', action: '/korisnici/new', actionLabel: 'Dodaj korisnika',
-      body: `<div class="group">${rows.map((u) => `
+    const cell = (u) => `
         <button class="cell" data-go="/korisnici/${u.id}" style="${u.active ? '' : 'opacity:.5'}">
           <span class="main"><span class="title one" style="display:block">${esc(u.full_name)}</span><span class="meta">@${esc(u.username)}${u.active ? '' : ' · neaktivan'}</span></span>
           <span class="muted nowrap">${ROLE[u.role]}</span>
           <span class="chev">${ICON.chev}</span>
-        </button>`).join('')}</div>`,
+        </button>`;
+    screen({
+      title: 'Korisnici', back: '/admin', action: '/korisnici/new', actionLabel: 'Dodaj korisnika',
+      body: Object.entries(TEAMS).map(([k, n]) => { const list = rows.filter((u) => (u.team || 'polaris') === k); return list.length ? `<div class="section-title">${n} · ${list.length}</div><div class="group">${list.map(cell).join('')}</div>` : ''; }).join(''),
     });
   } catch (e) { failed('Korisnici', '/admin', e); }
 }
@@ -2828,6 +2832,7 @@ function renderUserNew() {
         <label>Korisničko ime<input name="username" required autocapitalize="none" autocorrect="off" placeholder="npr. antonio"></label>
         <label>PIN (4 do 8 brojeva)<input name="pin" class="pin" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" required></label>
         <label>Uloga<select name="role"><option value="user">Zaposlenik (vidi samo svoje zadatke)</option><option value="admin">Admin (vidi sve osim Admin dijela)</option></select></label>
+        <label>Oznaka<select name="team">${teamOptions('polaris')}</select></label>
         <div class="err" id="err"></div>
         <button class="btn tap" type="submit">Napravi račun</button>
       </form>`,
@@ -2836,7 +2841,8 @@ function renderUserNew() {
   f.onsubmit = async (e) => {
     e.preventDefault();
     try {
-      await q(sb.rpc('admin_create_user', { p_username: val(f, 'username'), p_full_name: val(f, 'full_name'), p_pin: val(f, 'pin'), p_role: val(f, 'role') }));
+      const uid = await q(sb.rpc('admin_create_user', { p_username: val(f, 'username'), p_full_name: val(f, 'full_name'), p_pin: val(f, 'pin'), p_role: val(f, 'role') }));
+      if (f.team.value !== 'polaris' && uid) await q(sb.from('profiles').update({ team: f.team.value }).eq('id', uid));
       toast('Račun napravljen'); go('/korisnici');
     } catch (err) { document.getElementById('err').textContent = errText(err); }
   };
@@ -2850,12 +2856,13 @@ async function renderUserEdit(id) {
     body: `
       <div class="detail" style="margin-bottom:18px">
         <div class="item"><div class="label">Korisničko ime</div><div class="value">${esc(u.username)}</div></div>
-        <div class="item"><div class="label">Uloga</div><div class="value">${ROLE[u.role]}</div></div>
+        <div class="item"><div class="label">Uloga</div><div class="value">${ROLE[u.role]} · ${TEAMS[u.team] || 'Polaris'}</div></div>
       </div>
       <form id="f">
         <label>Ime i prezime<input name="full_name" value="${esc(u.full_name)}" required></label>
         ${u.role !== 'super_admin' ? `<label>Uloga<select name="role"><option value="user" ${u.role === 'user' ? 'selected' : ''}>Zaposlenik</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
         <label class="switch-row"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}> Račun aktivan</label>` : ''}
+        <label>Oznaka<select name="team">${teamOptions(u.team)}</select></label>
         <button class="btn tap" type="submit">Spremi</button>
       </form>
       <form id="p" style="margin-top:24px">
@@ -2867,7 +2874,7 @@ async function renderUserEdit(id) {
   const f = document.getElementById('f');
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const row = { full_name: val(f, 'full_name') };
+    const row = { full_name: val(f, 'full_name'), team: f.team.value };
     if (f.role) { row.role = f.role.value; row.active = f.active.checked; }
     try { await q(sb.from('profiles').update(row).eq('id', id)); toast('Spremljeno'); go('/korisnici'); } catch (err) { document.getElementById('err').textContent = errText(err); }
   };
