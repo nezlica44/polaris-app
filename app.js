@@ -287,7 +287,7 @@ function liveRefreshable() {
   const [path] = location.hash.slice(1).split('?');
   const p = (path || '/').split('/').filter(Boolean); const a = p[0] || '';
   if (['', 'kalendar', 'radnje', 'obavijesti'].includes(a)) return true;
-  if (['catering', 'zona7', 'luma'].includes(a)) return !['new', 'pregled'].includes(p[1]) && p[2] !== 'edit';
+  if (VENUES[a]) return !['new', 'pregled'].includes(p[1]) && p[2] !== 'edit';
   if (a === 'todo') return !p[1];
   return false;
 }
@@ -348,17 +348,20 @@ async function renderHome() {
     ]);
     const c = (c1 || 0) + (c2 || 0);
     if (location.hash.replace('#', '') in { '': 1, '/': 1 }) {
-      draw(c ? `${c} ${plural(c, 'nadolazeći termin', 'nadolazeća termina', 'nadolazećih termina')}` : 'Catering, Zona 7, Sala Luma', o ? `${o} ${plural(o, 'otvoren zadatak', 'otvorena zadatka', 'otvorenih zadataka')}` : 'Sve je gotovo');
+      draw(c ? `${c} ${plural(c, 'nadolazeći termin', 'nadolazeća termina', 'nadolazećih termina')}` : 'Catering, Domjenak, Zona 7, Sala Luma', o ? `${o} ${plural(o, 'otvoren zadatak', 'otvorena zadatka', 'otvorenih zadataka')}` : 'Sve je gotovo');
     }
   } catch { /* brojevi nisu nužni */ }
 }
 
 /* ---------- KALENDAR: Catering Polaris, Zona 7, Sala Luma ---------- */
 const VENUES = {
-  catering: { name: 'Catering Polaris', short: 'Catering', icon: 'polaris', color: 'v-catering', rgb: 'var(--v-catering)', path: '/catering', add: 'Dodaj catering', one: 'catering', sub: 'Domjenci na terenu' },
-  zona7: { name: 'Zona 7', short: 'Zona 7', icon: 'z7', color: 'v-zona7', rgb: 'var(--v-zona7)', path: '/zona7', add: 'Dodaj event', one: 'event', sub: 'Manja sala za proslave' },
-  luma: { name: 'Sala Luma', short: 'Sala Luma', icon: 'sun', color: 'v-luma', rgb: 'var(--v-luma)', path: '/luma', add: 'Dodaj event', one: 'event', sub: 'Velika sala' },
+  catering: { name: 'Catering Polaris', short: 'Catering', icon: 'polaris', color: 'v-catering', rgb: 'var(--v-catering)', path: '/catering', add: 'Dodaj catering', one: 'catering', many: 'cateringa', sub: 'Domjenci na terenu', cat: true },
+  domjenak: { name: 'Domjenak Polaris', short: 'Domjenak', icon: 'utensils', color: 'v-domjenak', rgb: 'var(--v-domjenak)', path: '/domjenak', add: 'Dodaj domjenak', one: 'domjenak', many: 'domjenaka', sub: 'Domjenci u restoranu', cat: true },
+  zona7: { name: 'Zona 7', short: 'Zona 7', icon: 'z7', color: 'v-zona7', rgb: 'var(--v-zona7)', path: '/zona7', add: 'Dodaj event', one: 'event', many: 'evenata', sub: 'Manja sala za proslave' },
+  luma: { name: 'Sala Luma', short: 'Sala Luma', icon: 'sun', color: 'v-luma', rgb: 'var(--v-luma)', path: '/luma', add: 'Dodaj event', one: 'event', many: 'evenata', sub: 'Velika sala' },
 };
+// catering i domjenak su u tablici caterings (stupac venue), Zona 7 i Sala Luma u events
+const kindName = (r) => (r.kind === 'event' ? 'Event' : r.venue === 'domjenak' ? 'Domjenak' : 'Catering');
 // boja sale (rgb triplet iz style.css, s tamnom varijantom); a = prozirnost za podlogu
 const vcol = (v, a) => (a != null ? `rgba(${VENUES[v].rgb},${a})` : `rgb(${VENUES[v].rgb})`);
 const MONTHS_N = ['Siječanj', 'Veljača', 'Ožujak', 'Travanj', 'Svibanj', 'Lipanj', 'Srpanj', 'Kolovoz', 'Rujan', 'Listopad', 'Studeni', 'Prosinac'];
@@ -443,12 +446,14 @@ function cateringCalc(c) {
   const sel = selectedItems(c);
   const pick = (g) => sel.filter((key) => FOOD[key].group === g);
   const row = (key, extra) => ({ key, ...FOOD[key], ...extra });
-  const k = { n, pkg: P ? c.package : null, custom: !P && sel.length > 0, lines: [], tables: Number(c.tables) || 0, barTables: Number(c.bar_tables) || 0, cutlery: !!c.cutlery && n > 0, plates: !!c.plates && n > 0, glasses: !!c.glasses && n > 0, ice: !!c.ice && n > 0 };
+  // domjenak u restoranu: beštek, tanjuri, čaše i led uvijek po osobi (ne naplaćuju se posebno), stolova nema
+  const dom = c.venue === 'domjenak';
+  const k = { n, pkg: P ? c.package : null, custom: !P && sel.length > 0, lines: [], tables: dom ? 0 : Number(c.tables) || 0, barTables: dom ? 0 : Number(c.bar_tables) || 0, cutlery: (dom || !!c.cutlery) && n > 0, plates: (dom || !!c.plates) && n > 0, glasses: (dom || !!c.glasses) && n > 0, ice: (dom || !!c.ice) && n > 0 };
   const pp = P ? P.price : Number(c.price_per_person) || 0;
   if (pp && n) k.lines.push([P ? `Paket ${c.package}` : 'Custom domjenak', `${n} × ${eur(pp)}`, pp * n]);
-  if (k.cutlery) k.lines.push(['Beštek', `${n} × ${eur(EXTRA.cutlery)}`, EXTRA.cutlery * n]);
-  if (k.plates) k.lines.push(['Tanjuri', `${n} × ${eur(EXTRA.plates)}`, EXTRA.plates * n]);
-  if (k.glasses) k.lines.push(['Čaše', `${n} × ${eur(EXTRA.glasses)}`, EXTRA.glasses * n]);
+  if (k.cutlery && !dom) k.lines.push(['Beštek', `${n} × ${eur(EXTRA.cutlery)}`, EXTRA.cutlery * n]);
+  if (k.plates && !dom) k.lines.push(['Tanjuri', `${n} × ${eur(EXTRA.plates)}`, EXTRA.plates * n]);
+  if (k.glasses && !dom) k.lines.push(['Čaše', `${n} × ${eur(EXTRA.glasses)}`, EXTRA.glasses * n]);
   if (k.tables) k.lines.push(['Stol + stolnjak', `${k.tables} × ${eur(EXTRA.table)}`, EXTRA.table * k.tables]);
   if (k.barTables) k.lines.push(['Barski stol + presvlaka', `${k.barTables} × ${eur(EXTRA.barTable)}`, EXTRA.barTable * k.barTables]);
   k.total = k.lines.reduce((s, l) => s + l[2], 0);
@@ -683,7 +688,7 @@ function calcParts(k) {
 // red u listi: { kind: 'catering' | 'event', id, venue, event_date, event_time, end_time, people, title, location, package, custom, creator, catering_id }
 const catRow = (c) => ({ kind: 'catering', venue: 'catering', ...c, custom: !c.package && c.custom && Object.keys(c.custom).length ? true : undefined });
 const evRow = (e) => ({ kind: 'event', ...e, event_time: e.start_time });
-const rowPath = (r) => (r.kind === 'catering' ? `/catering/${r.id}` : `${VENUES[r.venue].path}/${r.id}`);
+const rowPath = (r) => `${(VENUES[r.venue] || VENUES.catering).path}/${r.id}`;
 const timeRange = (r) => (r.event_time ? fmtTime(r.event_time).replace('h', '') + (r.end_time ? `–${fmtTime(r.end_time)}` : 'h') : '--:--');
 const pkgTag = (r, short) => (r.package ? `<span class="ptag">${short ? 'P' : 'Paket '}${r.package}</span>` : r.custom ? '<span class="ptag">Custom</span>' : '');
 
@@ -700,7 +705,7 @@ function dayCard(date, events, past) {
         <button class="ev" data-go="${rowPath(c)}">
           ${n > 1 ? `<span class="num">${i + 1}</span>` : ''}
           <span class="body">
-            <span class="title one" style="display:block">${esc(c.title || (c.kind === 'event' ? 'Event' : 'Catering'))}</span>
+            <span class="title one" style="display:block">${esc(c.title || kindName(c))}</span>
             <span class="meta">
               <span class="i-people">${ICON.people}${c.people ?? '–'}</span>
               <span class="i-clock ${c.event_time ? '' : 'unset'}">${ICON.clock}${timeRange(c)}</span>
@@ -721,10 +726,10 @@ function groupByDate(rows) {
 }
 const byTime = (a, b) => a.event_date.localeCompare(b.event_date) || String(a.event_time || '99').localeCompare(String(b.event_time || '99'));
 
-const CAT_SEL = 'id, event_date, event_time, people, title, location, package, custom, creator:profiles(full_name)';
+const CAT_SEL = 'id, venue, event_date, event_time, people, title, location, package, custom, creator:profiles(full_name)';
 const EV_SEL = 'id, venue, event_date, start_time, end_time, people, title, catering_id, creator:profiles(full_name)';
 async function loadRows(venue) {
-  if (venue === 'catering') return (await q(sb.from('caterings').select(CAT_SEL))).map(catRow).sort(byTime);
+  if (VENUES[venue]?.cat) return (await q(sb.from('caterings').select(CAT_SEL).eq('venue', venue))).map(catRow).sort(byTime);
   if (venue) return (await q(sb.from('events').select(EV_SEL).eq('venue', venue))).map(evRow).sort(byTime);
   const [c, e] = await Promise.all([q(sb.from('caterings').select(CAT_SEL)), q(sb.from('events').select(EV_SEL))]);
   return [...c.map(catRow), ...e.map(evRow)].sort(byTime);
@@ -780,7 +785,7 @@ function renderCal(box, rows, venue) {
           <span class="vbar" style="background:${vcol(r.venue)}"></span>
           <span class="main">
             <span class="title one" style="display:block">${timeRange(r)} · ${esc(VENUES[r.venue].short)}${r.kind === 'catering' && r.location ? ` / ${esc(r.location)}` : r.title ? ` / ${esc(r.title)}` : ''}</span>
-            <span class="meta one">${esc([r.kind === 'catering' ? r.title || 'Catering' : '', r.people && `${r.people} ${plural(r.people, 'osoba', 'osobe', 'osoba')}`, r.package ? `paket ${r.package}` : r.custom ? 'custom' : '', r.kind === 'event' && r.catering_id ? '+ catering' : ''].filter(Boolean).join(' · '))}</span>
+            <span class="meta one">${esc([r.kind === 'catering' ? r.title || kindName(r) : '', r.people && `${r.people} ${plural(r.people, 'osoba', 'osobe', 'osoba')}`, r.package ? `paket ${r.package}` : r.custom ? 'custom' : '', r.kind === 'event' && r.catering_id ? '+ catering' : ''].filter(Boolean).join(' · '))}</span>
           </span>
           <span class="chev">${ICON.chev}</span>
         </button>`).join('')}</div>` : '<div class="empty">Slobodan dan.</div>'}
@@ -829,7 +834,7 @@ async function renderVenueList(venue) {
     const count = (days) => days.reduce((s, [, ev]) => s + ev.length, 0);
     const list = () => {
       const days = tabs[cateringTab];
-      if (!days.length) return `<div class="empty">${cateringTab === 'past' ? `Nema prošlih ${venue === 'catering' ? 'cateringa' : 'evenata'}.` : `Nema nadolazećih ${venue === 'catering' ? 'cateringa' : 'evenata'}.<br>${V.add} na +`}</div>`;
+      if (!days.length) return `<div class="empty">${cateringTab === 'past' ? `Nema prošlih ${V.many}.` : `Nema nadolazećih ${V.many}.<br>${V.add} na +`}</div>`;
       return `<div class="list">${days.map(([d, ev]) => dayCard(d, ev, cateringTab === 'past')).join('')}</div>`;
     };
     const draw = () => {
@@ -893,8 +898,9 @@ function cateringHero(c, extraChips = '') {
     </div>`;
 }
 
-async function renderCateringDetail(id) {
-  const my = loading('Catering', '/catering');
+async function renderCateringDetail(id, venue = 'catering') {
+  let V = VENUES[venue] || VENUES.catering;
+  const my = loading(V.short, V.path);
   try {
     const [c, items, ev] = await Promise.all([
       q(sb.from('caterings').select('*, creator:profiles(full_name)').eq('id', id).single()),
@@ -902,25 +908,26 @@ async function renderCateringDetail(id) {
       sb.from('events').select('id, venue, title').eq('catering_id', id).limit(1).maybeSingle().then((r) => r.data, () => null),
     ]);
     if (stale(my)) return;
+    V = VENUES[c.venue] || V;
     const parts = calcParts(costCalc(cateringCalc(c), items));
     screen({
-      title: c.title || 'Catering', back: '/catering',
+      title: c.title || kindName({ venue: c.venue }), back: V.path,
       body: `
         ${cateringHero(c, (ev ? `<button class="chip link tap" data-go="${VENUES[ev.venue].path}/${ev.id}">${esc(VENUES[ev.venue].short)}: ${esc(ev.title || 'event')}${ICON.chev}</button>` : '') + (c.creator ? `<span class="chip who">${esc(firstName(c.creator))}</span>` : ''))}
         ${parts.take}${parts.pay}${parts.buy}
         <div class="actions">
-          <button class="btn secondary tap" data-go="/catering/${c.id}/edit">Uredi</button>
-          <button class="btn danger" id="del">Obriši catering</button>
+          <button class="btn secondary tap" data-go="${V.path}/${c.id}/edit">Uredi</button>
+          <button class="btn danger" id="del">Obriši ${V.one}</button>
         </div>`,
     });
     document.getElementById('del').onclick = async () => {
       if (!confirm(ev ? `Catering je vezan na event "${ev.title || 'event'}" (${VENUES[ev.venue].name}). Obrisati catering i odvojiti ga od eventa?` : 'Obrisati ovaj catering?')) return;
       try {
         if (ev) await q(sb.from('events').update({ catering_id: null }).eq('catering_id', id));
-        await q(sb.from('caterings').delete().eq('id', id)); toast('Obrisano'); go('/catering');
+        await q(sb.from('caterings').delete().eq('id', id)); toast('Obrisano'); go(V.path);
       } catch (e) { toast(errText(e)); }
     };
-  } catch (e) { if (!stale(my)) failed('Catering', '/catering', e); }
+  } catch (e) { if (!stale(my)) failed(V.short, V.path, e); }
 }
 
 function pkgButton(p, selected) {
@@ -950,20 +957,21 @@ let eDraft = null; // nacrt eventa dok se dodaje catering
 const evFormRoute = () => (eDraft ? `${VENUES[eDraft.venue].path}/${eDraft.id ? `${eDraft.id}/edit` : 'new'}?draft=1` : null);
 const keepDraft = (route, extra = '') => history.replaceState(null, '', `#${route}?draft=1${extra}`); // da i sistemski "natrag" vrati nacrt
 
-async function renderCateringForm(id, params) {
-  const route = id ? `/catering/${id}/edit` : '/catering/new';
+async function renderCateringForm(id, params, venue = 'catering') {
+  let V = VENUES[venue]?.cat ? VENUES[venue] : VENUES.catering;
+  const route = id ? `${V.path}/${id}/edit` : `${V.path}/new`;
   const resume = !!(cDraft && cDraft._route === route && params.get('draft') === '1');
   if (!resume) cDraft = null;
   const forEvent = (params.get('ev') === '1' || (resume && cDraft._ev)) && eDraft;
   let c;
   if (resume) c = cDraft;
   else {
-    c = { event_date: params.get('d') || todayStr(), custom: null };
+    c = { event_date: params.get('d') || todayStr(), custom: null, venue: V.cat ? venue : 'catering' };
     if (id) {
       // Ako se zapis ne učita, ne prikazujemo praznu formu (Spremi bi prepisao catering praznim poljima).
-      const back = forEvent ? evFormRoute() : `/catering/${id}`;
-      loading('Uredi catering', back);
-      try { c = await q(sb.from('caterings').select('*').eq('id', id).single()); } catch (e) { return failed('Uredi catering', back, e); }
+      const back = forEvent ? evFormRoute() : `${V.path}/${id}`;
+      loading(`Uredi ${V.one}`, back);
+      try { c = await q(sb.from('caterings').select('*').eq('id', id).single()); } catch (e) { return failed(`Uredi ${V.one}`, back, e); }
     }
     else if (forEvent) c = { ...c, title: eDraft.title, event_date: eDraft.event_date, event_time: eDraft.start_time, people: eDraft.people, location: VENUES[eDraft.venue].name, contact: eDraft.contact };
   }
@@ -971,9 +979,11 @@ async function renderCateringForm(id, params) {
   const custom = c.custom || {};
   // stari zapisi: banjice i dodatno spajamo u opis
   const desc = [c.description, c.platters && `Banjice: ${c.platters}`, c.extras && `Dodatno: ${c.extras}`].filter(Boolean).join('\n');
-  const back = forEvent ? evFormRoute() : id ? `/catering/${id}` : '/catering';
+  V = VENUES[c.venue] || V;
+  const dom = c.venue === 'domjenak';
+  const back = forEvent ? evFormRoute() : id ? `${V.path}/${id}` : V.path;
   screen({
-    title: forEvent ? `Catering za ${VENUES[eDraft.venue].short}` : id ? 'Uredi catering' : 'Novi catering', back,
+    title: forEvent ? `Catering za ${VENUES[eDraft.venue].short}` : id ? `Uredi ${V.one}` : `Novi ${V.one}`, back,
     body: `
       <form id="f" novalidate>
         <div class="ftitle">Paket</div>
@@ -990,6 +1000,7 @@ async function renderCateringForm(id, params) {
             }).join('')}</div>`).join('')}
           <label style="margin-top:14px">Cijena po osobi (€)<input name="price_per_person" inputmode="decimal" value="${esc(c.price_per_person)}" placeholder="koliko naplaćuješ po osobi"></label>
         </div>
+        <div ${dom ? 'hidden' : ''}>
         <div class="ftitle">Dodatno</div>
         <div class="xopts">
           ${switchRow('cutlery', 'Beštek', `vilica, žlica, nož, salveta · ${eur(EXTRA.cutlery)} po osobi`, c.cutlery)}
@@ -999,13 +1010,14 @@ async function renderCateringForm(id, params) {
           <div class="xrow"><span class="xt">Stol + stolnjak<small>${eur(EXTRA.table)} po stolu</small></span>${stepper('tables', c.tables)}</div>
           <div class="xrow"><span class="xt">Barski stol + presvlaka<small>${eur(EXTRA.barTable)} po stolu</small></span>${stepper('bar_tables', c.bar_tables)}</div>
         </div>
+        </div>
         <div class="ftitle">Podaci</div>
         <label>Naziv<input name="title" value="${esc(c.title)}" placeholder="npr. Rođendan Horvat, Bowling"></label>
         <div class="grid2">
           <label>Datum<input name="event_date" type="date" value="${esc(c.event_date)}" required></label>
           <label>Vrijeme<input name="event_time" type="time" value="${esc(c.event_time?.slice(0, 5))}"></label>
         </div>
-        <label>Lokacija<input name="location" value="${esc(c.location)}" placeholder="npr. Sala Luma, J.J. Strossmayera 271"></label>
+        <label>Lokacija<input name="location" value="${esc(c.location)}" placeholder="${dom ? 'npr. velika sala, terasa' : 'npr. Sala Luma, J.J. Strossmayera 271'}"></label>
         <label>Kontakt<input name="contact" value="${esc(c.contact)}" placeholder="ime i broj mobitela"></label>
         <label>Opis i napomene<textarea name="description" style="min-height:120px" placeholder="posebni zahtjevi, alergije, pizze, napomene…">${esc(desc)}</textarea></label>
         <div id="calc"></div>
@@ -1019,7 +1031,7 @@ async function renderCateringForm(id, params) {
   const touched = new Set(c._touched || Object.keys(custom).filter((k) => FOOD[k]?.group === 'pcs' && custom[k] && Number(custom[k]) !== pcsPor(Number(c.people) || 0, k)).map((k) => `por_${k}`));
   const state = () => {
     const s = {
-      package: Number(f.elements.package.value) || null, people: numVal(f, 'people'), cutlery: f.elements.cutlery.checked, plates: f.elements.plates.checked, glasses: f.elements.glasses.checked, ice: f.elements.ice.checked,
+      venue: c.venue, package: Number(f.elements.package.value) || null, people: numVal(f, 'people'), cutlery: f.elements.cutlery.checked, plates: f.elements.plates.checked, glasses: f.elements.glasses.checked, ice: f.elements.ice.checked,
       tables: Number(f.elements.tables.value) || 0, bar_tables: Number(f.elements.bar_tables.value) || 0, price_per_person: null, custom: null,
     };
     if (f.elements.is_custom.checked) {
@@ -1108,18 +1120,18 @@ async function renderCateringForm(id, params) {
         await q(sb.from('caterings').update(cateringRow(draft)).eq('id', id));
         cDraft = null;
         toast('Spremljeno');
-        go(forEvent ? evFormRoute() : `/catering/${id}`);
+        go(forEvent ? evFormRoute() : `${V.path}/${id}`);
       } catch (e2) { err.textContent = errText(e2); btn.disabled = false; }
       return;
     }
     cDraft = draft;
     keepDraft(route, forEvent ? '&ev=1' : '');
-    go('/catering/pregled');
+    go(`${V.path}/pregled`);
   };
 }
 
 const cateringRow = (c) => ({
-  title: c.title, event_date: c.event_date, event_time: c.event_time, people: c.people, location: c.location, contact: c.contact,
+  venue: VENUES[c.venue]?.cat ? c.venue : 'catering', title: c.title, event_date: c.event_date, event_time: c.event_time, people: c.people, location: c.location, contact: c.contact,
   description: c.description, platters: null, extras: null, package: c.package, custom: c.custom, price_per_person: c.price_per_person,
   cutlery: !!c.cutlery, plates: !!c.plates, glasses: !!c.glasses, ice: !!c.ice, tables: c.tables || 0, bar_tables: c.bar_tables || 0,
 });
@@ -1127,15 +1139,16 @@ const cateringRow = (c) => ({
 async function renderCateringPreview() {
   if (!cDraft) return go('/catering');
   const c = cDraft;
+  const V = VENUES[c.venue] || VENUES.catering;
   const formRoute = `${c._route}?draft=1${c._ev ? '&ev=1' : ''}`;
   const evRoute = c._ev && eDraft ? evFormRoute() : null;
   loading('Pretpregled', formRoute);
   const items = await loadItems();
   const parts = calcParts(costCalc(cateringCalc(c), items));
   screen({
-    title: c.title || 'Catering', back: formRoute,
+    title: c.title || kindName(c), back: formRoute,
     body: `
-      <p class="muted small" style="margin:0 4px 10px">Pretpregled. Catering ${c.id ? 'još nije promijenjen' : 'još nije dodan'}, provjeri pa potvrdi.</p>
+      <p class="muted small" style="margin:0 4px 10px">Pretpregled. ${kindName(c)} ${c.id ? 'još nije promijenjen' : 'još nije dodan'}, provjeri pa potvrdi.</p>
       ${cateringHero(c)}
       ${parts.take}${parts.pay}${parts.buy}
       <div class="err" id="err"></div>
@@ -1154,14 +1167,14 @@ async function renderCateringPreview() {
       else { cid = (await q(sb.from('caterings').insert(cateringRow(c)).select('id').single())).id; flushPush(); }
       cDraft = null;
       toast('Spremljeno');
-      if (evRoute) { eDraft.catering_id = cid; eDraft.catering = null; go(evRoute); } else go(`/catering/${cid}`);
+      if (evRoute) { eDraft.catering_id = cid; eDraft.catering = null; go(evRoute); } else go(`${V.path}/${cid}`);
     } catch (err) { document.getElementById('err').textContent = errText(err); btn.disabled = false; }
   };
   document.getElementById('drop').onclick = () => {
-    if (!confirm(c.id ? 'Odbaciti promjene?' : 'Obrisati ovaj nacrt cateringa?')) return;
+    if (!confirm(c.id ? 'Odbaciti promjene?' : `Obrisati ovaj nacrt ${V.one === 'domjenak' ? 'domjenka' : 'cateringa'}?`)) return;
     cDraft = null;
     if (evRoute && !c.id && eDraft) eDraft.catering = null; // nacrt cateringa se miče i s eventa
-    go(evRoute || (c.id ? `/catering/${c.id}` : '/catering'));
+    go(evRoute || (c.id ? `${V.path}/${c.id}` : V.path));
   };
 }
 
@@ -2012,7 +2025,7 @@ async function renderActivity() {
   try {
     const [tasks, cats, items, evs] = await Promise.all([
       q(sb.from('tasks').select('title, done, done_at, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), creator:profiles!tasks_created_by_fkey(full_name)').order('created_at', { ascending: false }).limit(40)),
-      q(sb.from('caterings').select('title, event_date, created_at, creator:profiles(full_name)').order('created_at', { ascending: false }).limit(20)),
+      q(sb.from('caterings').select('title, venue, event_date, created_at, creator:profiles(full_name)').order('created_at', { ascending: false }).limit(20)),
       q(sb.from('items').select('name, price_net, unit, updated_at, suppliers(name)').order('updated_at', { ascending: false }).limit(20)),
       q(sb.from('events').select('title, venue, event_date, created_at, creator:profiles(full_name)').order('created_at', { ascending: false }).limit(20)),
     ]);
@@ -2022,7 +2035,7 @@ async function renderActivity() {
       ev.push({ at: t.created_at, txt: `${t.creator?.full_name || 'Admin'} zadao: ${t.title} → ${t.assignee?.full_name || ''}` });
       if (t.done && t.done_at) ev.push({ at: t.done_at, txt: `${t.assignee?.full_name || ''} označio gotovo: ${t.title}`, good: true });
     });
-    cats.forEach((c) => ev.push({ at: c.created_at, txt: `${c.creator?.full_name || 'Admin'} dodao catering: ${c.title || 'Catering'} (${fmtDateShort(c.event_date)})` }));
+    cats.forEach((c) => ev.push({ at: c.created_at, txt: `${c.creator?.full_name || 'Admin'} dodao ${c.venue === 'domjenak' ? 'domjenak' : 'catering'}: ${c.title || kindName({ venue: c.venue })} (${fmtDateShort(c.event_date)})` }));
     evs.forEach((x) => ev.push({ at: x.created_at, txt: `${x.creator?.full_name || 'Admin'} dodao event u ${VENUES[x.venue]?.name || x.venue}: ${x.title || 'Event'} (${fmtDateShort(x.event_date)})` }));
     items.forEach((i) => ev.push({ at: i.updated_at, txt: `Cijena: ${i.name} ${eur(i.price_net)}/${i.unit} (${i.suppliers?.name || ''})` }));
     ev.sort((a, b) => String(b.at).localeCompare(String(a.at)));
@@ -2148,12 +2161,12 @@ async function dispatch(p, params) {
     case 'pin': return renderMyPin();
     case 'obavijesti': return renderNotifications();
     case 'kalendar': return renderKalendar();
-    case 'catering':
-      if (!p[1]) return renderVenueList('catering');
-      if (p[1] === 'new') return renderCateringForm(null, params);
+    case 'catering': case 'domjenak':
+      if (!p[1]) return renderVenueList(p[0]);
+      if (p[1] === 'new') return renderCateringForm(null, params, p[0]);
       if (p[1] === 'pregled') return renderCateringPreview();
-      if (p[2] === 'edit') return renderCateringForm(p[1], params);
-      return renderCateringDetail(p[1]);
+      if (p[2] === 'edit') return renderCateringForm(p[1], params, p[0]);
+      return renderCateringDetail(p[1], p[0]);
     case 'zona7': case 'luma':
       if (!p[1]) return renderVenueList(p[0]);
       if (p[1] === 'new') return renderEventForm(p[0], null, params);
