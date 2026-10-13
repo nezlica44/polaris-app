@@ -58,7 +58,12 @@ const ICON = {
   glass: svg('<path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/>'),
   note: svg('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'),
 };
+// znakovi sala: Polaris (sazviježđe iz print kita), Zona 7 (znak 7Z s bannera), Sala Luma (sunce iz loga)
+ICON.polaris = '<svg viewBox="0 0 13.69 22.49"><path d="M7.09 7 L6.81 7.37 M5.86 9.08 L5.33 10.49 M4.84 12.39 L4.61 14 M3.71 15.6 L2.57 16.54 M2.03 18.23 L2.48 19.85 M3.5 20.16 L4.78 19.08 M5.25 17.5 L4.77 15.92" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"></path><path d="M8.32 5.48 L12.69 5.36 L8.32 5.25 Z" fill="currentColor"></path><path d="M8.21 5.36 L8.32 9.73 L8.43 5.36 Z" fill="currentColor"></path><path d="M8.32 5.25 L3.96 5.36 L8.32 5.48 Z" fill="currentColor"></path><path d="M8.43 5.36 L8.32 1 L8.21 5.36 Z" fill="currentColor"></path><path d="M8.32 3.61 L8.64 5.05 L10.07 5.36 L8.64 5.68 L8.32 7.12 L8 5.68 L6.57 5.36 L8 5.05 Z" fill="currentColor"></path><path d="M8.32 4.7 L8.45 5.24 L8.99 5.36 L8.45 5.49 L8.32 6.03 L8.19 5.49 L7.65 5.36 L8.19 5.24 Z" fill="currentColor"></path><path d="M6.21 7.47 L6.34 8.03 L6.9 8.15 L6.34 8.28 L6.21 8.84 L6.09 8.28 L5.53 8.15 L6.09 8.03 Z" fill="currentColor"></path><path d="M4.97 10.72 L5.1 11.28 L5.66 11.41 L5.1 11.53 L4.97 12.1 L4.85 11.53 L4.29 11.41 L4.85 11.28 Z" fill="currentColor"></path><path d="M4.48 14.29 L4.6 14.85 L5.17 14.97 L4.6 15.1 L4.48 15.66 L4.35 15.1 L3.79 14.97 L4.35 14.85 Z" fill="currentColor"></path><path d="M1.75 16.46 L1.89 17.07 L2.5 17.21 L1.89 17.34 L1.75 17.96 L1.61 17.34 L1 17.21 L1.61 17.07 Z" fill="currentColor"></path><path d="M2.74 20.12 L2.87 20.68 L3.43 20.8 L2.87 20.93 L2.74 21.49 L2.62 20.93 L2.05 20.8 L2.62 20.68 Z" fill="currentColor"></path><path d="M5.53 17.76 L5.66 18.32 L6.22 18.45 L5.66 18.57 L5.53 19.13 L5.41 18.57 L4.84 18.45 L5.41 18.32 Z" fill="currentColor"></path></svg>';
+ICON.z7 = '<svg viewBox="-96 30 830 830" fill="currentColor"><path d="M48 180H430L48 840V719L319 250H48Z"/><path d="M590 50V175L319 650H590V715H210Z"/></svg>';
+ICON.sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5.5 15.5a6.5 6.5 0 0 1 13 0"/><path d="M20.6 15.5L23.4 15.5M19.4 11.2L21.0 10.3M16.3 8.1L17.7 5.6M12.0 6.9L12.0 5.1M7.7 8.1L6.3 5.6M4.6 11.2L3.0 10.3M3.4 15.5L0.6 15.5M3 18.5h18"/></svg>';
 const LOGO = '<img src="polaris-logo.png" alt="Polaris" class="logo" onerror="this.remove()">';
+const NEROTTA = '<img src="nerotta.svg" alt="Nerotta" class="logo" onerror="this.remove()">';
 
 function toast(msg) {
   const t = document.createElement('div');
@@ -101,6 +106,12 @@ function loading(title, back) { if (!liveSilent) screen({ title, back, body: '<p
 const stale = (my) => my !== renderSeq;
 function failed(title, back, e) { screen({ title, back, body: `<p class="err">${esc(errText(e))}</p>` }); }
 
+// pločica (sale u Kalendaru): ikona gore, naziv i broj ispod; do 4 u redu
+const tileBtn = (path, icon, color, name, sub) => `
+  <button class="tap tile" data-go="${path}">
+    <span class="ico ${color}">${ICON[icon]}</span>
+    <span class="name">${esc(name)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}
+  </button>`;
 const menuBtn = (path, icon, color, name, sub) => `
   <button class="tap" data-go="${path}">
     <span class="ico ${color}">${ICON[icon]}</span>
@@ -311,10 +322,10 @@ async function renderHome() {
       title: '', hideTitle: true,
       right: isSuper() ? `<button class="roundbtn plain tap" data-go="/admin" aria-label="Admin">${ICON.gear}</button>` : '',
       body: `
-        <div class="home-hero">${LOGO}<div class="hello">Bok, ${esc(me.full_name)}</div></div>
+        <div class="home-hero">${NEROTTA}<div class="hello">Bok, ${esc(me.full_name)}</div></div>
         <div class="menu">
           ${menuBtn('/kalendar', 'calendar', 'green', 'Kalendar', cat)}
-          ${menuBtn('/restoran', 'utensils', 'gold', 'Restoran', 'Jelovnik, normativ, nabavka')}
+          ${menuBtn('/restoran', 'utensils', 'green', 'Polaris', 'Jelovnik, normativ, nabavka')}
           ${menuBtn('/todo', 'todo', 'green', 'To-do', todo)}
         </div>
         <div id="pushask"></div>
@@ -344,9 +355,9 @@ async function renderHome() {
 
 /* ---------- KALENDAR: Catering Polaris, Zona 7, Sala Luma ---------- */
 const VENUES = {
-  catering: { name: 'Catering Polaris', short: 'Catering', color: 'green', rgb: 'var(--v-catering)', path: '/catering', add: 'Dodaj catering', one: 'catering', sub: 'Domjenci na terenu' },
-  zona7: { name: 'Zona 7', short: 'Zona 7', color: 'gold', rgb: 'var(--v-zona7)', path: '/zona7', add: 'Dodaj event', one: 'event', sub: 'Manja sala za proslave' },
-  luma: { name: 'Sala Luma', short: 'Sala Luma', color: 'blue', rgb: 'var(--v-luma)', path: '/luma', add: 'Dodaj event', one: 'event', sub: 'Velika sala' },
+  catering: { name: 'Catering Polaris', short: 'Catering', icon: 'polaris', color: 'v-catering', rgb: 'var(--v-catering)', path: '/catering', add: 'Dodaj catering', one: 'catering', sub: 'Domjenci na terenu' },
+  zona7: { name: 'Zona 7', short: 'Zona 7', icon: 'z7', color: 'v-zona7', rgb: 'var(--v-zona7)', path: '/zona7', add: 'Dodaj event', one: 'event', sub: 'Manja sala za proslave' },
+  luma: { name: 'Sala Luma', short: 'Sala Luma', icon: 'sun', color: 'v-luma', rgb: 'var(--v-luma)', path: '/luma', add: 'Dodaj event', one: 'event', sub: 'Velika sala' },
 };
 // boja sale (rgb triplet iz style.css, s tamnom varijantom); a = prozirnost za podlogu
 const vcol = (v, a) => (a != null ? `rgba(${VENUES[v].rgb},${a})` : `rgb(${VENUES[v].rgb})`);
@@ -400,7 +411,6 @@ const PACKAGES = {
 const EXTRA = { cutlery: 2, plates: 1, glasses: 0.5, table: 25, barTable: 15 }; // beštek (vilica, žlica, nož, salveta), tanjuri, čaše po osobi; stolovi po komadu
 const GELS_PER_BANJICA = 1; // pretpostavka: grijaćih gelova po banjici
 const MEAT_RATIO = { chicken: 45, beef: 25, pork: 25 }; // piletina / junetina / svinjetina, cca
-const CAT_NAME = { chicken: 'piletina', beef: 'junetina', pork: 'svinjetina' };
 const SIDE_G = 300; // g riže, pekarskog i kroketa po osobi (split 40/40/20)
 const LAZ_G = 300; // jedna lazanjera = porcija od 300 g
 const LAZ_PER = 30; // g po osobi od svakog lazanjerskog priloga
@@ -465,10 +475,6 @@ function cateringCalc(c) {
       return row(key, { pcs, g: pcs * f.piece });
     });
     k.meatG = k.meat.reduce((a, m) => a + m.g, 0);
-    const parts = [];
-    if (fixedG.vrat != null) parts.push('vrat 1 kom na 10 osoba');
-    if (wsum) parts.push(`${fixedG.vrat != null ? 'ostalo ' : ''}omjer ${Object.keys(MEAT_RATIO).filter((cat) => cats[cat]).map((cat) => `${CAT_NAME[cat]} ${MEAT_RATIO[cat]}`).join(' : ')}`);
-    k.ratio = parts.join(' · ');
   }
   // prilozi po težini: 300 g po osobi, riža 40 / pekarski 40 / kroketi 20
   const sides = pick('side');
@@ -659,7 +665,7 @@ function calcParts(k) {
     const dessertRows = (k.cakesKg ? brow('Domaći kolači', `${num(k.cakesKg, 1)} kg`, `${num(k.cakesKg, 1)} kg`, `${CAKES_KG_PER_10} kg na 10 osoba`) : '') + (k.torte || []).filter((t) => t.cnt).map((t) => brow(t.name, `${t.cnt} kom`, `${t.cnt} kom`, `1 torta na ${TORTA_PEOPLE} osoba`)).join('');
     buy = `<div class="section-title">Za kupiti</div><div class="kcard buy">
       ${head}
-      ${k.meat ? group('Meso', right(kgTxt(k.meatG), k.meat), k.meat.map(meatRow).join(''), k.ratio) : ''}
+      ${k.meat ? group('Meso', right(kgTxt(k.meatG), k.meat), k.meat.map(meatRow).join('')) : ''}
       ${sideRows.length ? group('Prilozi', right(sideQty, [...(k.sides || []), ...pcsRows, ...(k.laz || [])]), sideRows.join('')) : ''}
       ${k.saladN ? group('Salate', right(`${k.saladN} ${plural(k.saladN, 'salata', 'salate', 'salata')}`, k.salads), k.salads.map((x) => brow(x.name, `${x.cnt} ${plural(x.cnt, 'zdjela', 'zdjele', 'zdjela')}`, `${x.cnt} kom`, '', money(x))).join('')) : ''}
       ${k.breadN ? group('Lepinjice', right(krug(k.breadN), k.breads), k.breads.map((x) => brow(x.name, krug(x.cnt), `${x.pieces} kom`, `porcija od ${BREAD_PORTION * BREAD_PCS} kom ${eur(FOOD[x.key].cost)}`, money(x))).join('')) : ''}
@@ -798,11 +804,11 @@ async function renderKalendar() {
     const rows = await loadRows();
     if (stale(my)) return;
     const t = todayStr();
-    const cnt = (v) => { const n = rows.filter((r) => r.venue === v && r.event_date >= t).length; return n ? `${n} ${plural(n, 'nadolazeći', 'nadolazeća', 'nadolazećih')}` : VENUES[v].sub; };
+    const cnt = (v) => { const n = rows.filter((r) => r.venue === v && r.event_date >= t).length; return `${n} ${plural(n, 'nadolazeći', 'nadolazeća', 'nadolazećih')}`; };
     screen({
       title: 'Kalendar', back: '/',
       body: `
-        <div class="menu">${Object.entries(VENUES).map(([v, V]) => menuBtn(V.path, v === 'catering' ? 'calendar' : 'glass', V.color, V.name, cnt(v))).join('')}</div>
+        <div class="menu tiles">${Object.entries(VENUES).map(([v, V]) => tileBtn(V.path, V.icon, V.color, V.short, cnt(v))).join('')}</div>
         <div class="section-title">Svi datumi</div>
         <div id="cal"></div>`,
     });
@@ -861,7 +867,6 @@ const telLink = (s) => esc(s).replace(/\+?\d[\d\s/-]{5,}\d/g, (m) => `<a href="t
 function cateringHero(c, extraChips = '') {
   const d = parseDate(c.event_date);
   const info = [
-    c.location && [ICON.pin, 'Lokacija', esc(c.location)],
     c.contact && [ICON.phone, 'Kontakt', telLink(c.contact)],
     c.description && [ICON.note, 'Opis i napomene', esc(c.description)],
     c.platters && [ICON.note, 'Banjice', esc(c.platters)],
@@ -877,6 +882,7 @@ function cateringHero(c, extraChips = '') {
         ${PACKAGES[c.package] ? `<span class="chip gold">Paket ${c.package}</span>` : customList ? '<span class="chip gold">Custom domjenak</span>' : ''}
         ${c.event_time ? `<span class="chip">${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
         ${c.people ? `<span class="chip">${ICON.people}${c.people} ${plural(c.people, 'osoba', 'osobe', 'osoba')}</span>` : ''}
+        ${c.location ? `<span class="chip loc">${ICON.pin}${esc(c.location)}</span>` : ''}
         ${c.cutlery ? '<span class="chip">Beštek</span>' : ''}${c.plates ? '<span class="chip">Tanjuri</span>' : ''}${c.glasses ? '<span class="chip">Čaše</span>' : ''}${c.ice ? '<span class="chip">Led</span>' : ''}
         ${extraChips}
       </div>
@@ -1289,12 +1295,12 @@ async function renderEventForm(venue, id, params) {
 /* ---------- RESTORAN ---------- */
 function renderRestoranMenu() {
   screen({
-    title: 'Restoran', back: '/',
+    title: 'Polaris', back: '/',
     body: `<div class="menu">
       ${menuBtn('/jelovnik', 'book', 'green', 'Jelovnik', 'Normativi, recepti, food cost')}
-      ${menuBtn('/dostava', 'bike', 'gold', 'Jelovnik - Dostava', 'Cijene za Wolt i sl.')}
+      ${menuBtn('/dostava', 'bike', 'green', 'Jelovnik - Dostava', 'Cijene za Wolt i sl.')}
       ${menuBtn('/normativ', 'scale', 'green', 'Normativ', 'Sastojci i food cost svih jela')}
-      ${menuBtn('/nabavka', 'cart', 'gold', 'Nabavka', 'Food, Drink, Chemical')}
+      ${menuBtn('/nabavka', 'cart', 'green', 'Nabavka', 'Food, Drink, Chemical')}
     </div>`,
   });
 }
@@ -1302,8 +1308,8 @@ function renderRestoranMenu() {
 /* ---------- NABAVKA: Food / Drink / Chemical, pa dobavljači i artikli ---------- */
 const NCATS = {
   food: { name: 'Food', sub: 'Hrana', icon: 'utensils', color: 'green' },
-  drink: { name: 'Drink', sub: 'Pića', icon: 'cup', color: 'gold' },
-  chemical: { name: 'Chemical', sub: 'Kemija i potrošni', icon: 'spray', color: 'blue' },
+  drink: { name: 'Drink', sub: 'Pića', icon: 'cup', color: 'green' },
+  chemical: { name: 'Chemical', sub: 'Kemija i potrošni', icon: 'spray', color: 'green' },
 };
 const catChips = (type, name, selected) => Object.entries(NCATS).map(([k, c]) => `<label class="catchip"><input type="${type}" name="${name}" value="${k}" ${selected.includes(k) ? 'checked' : ''}><span>${c.name}</span></label>`).join('');
 const pickLabel = (t) => `<div style="font-size:13px;font-weight:600;color:var(--muted);padding-left:4px;margin-bottom:8px">${t}</div>`;
@@ -1996,7 +2002,7 @@ function renderAdmin() {
     title: 'Admin', back: '/',
     body: `<div class="menu">
       ${menuBtn('/korisnici', 'users', 'green', 'Korisnici', 'Računi, uloge, PIN-ovi')}
-      ${menuBtn('/radnje', 'activity', 'gold', 'Radnje', 'Što se zadnje mijenjalo')}
+      ${menuBtn('/radnje', 'activity', 'green', 'Radnje', 'Što se zadnje mijenjalo')}
     </div>`,
   });
 }

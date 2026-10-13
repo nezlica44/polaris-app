@@ -16,8 +16,8 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 1px 1px rgba(0, 0, 0, .03);
   /* boje sala (rgb tripleti, koriste se kao rgb(var(--v-…)) i rgba(var(--v-…), a)) */
   --v-catering: 31, 92, 69;
-  --v-zona7: 200, 150, 46;
-  --v-luma: 58, 120, 194;
+  --v-zona7: 29, 37, 69;
+  --v-luma: 200, 150, 46;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -31,8 +31,8 @@
     --accent-ink: #062016;
     --accent-soft: #163327;
     --v-catering: 95, 195, 154;
-    --v-zona7: 227, 180, 86;
-    --v-luma: 111, 163, 232;
+    --v-zona7: 150, 168, 226;
+    --v-luma: 227, 180, 86;
     --gold: #e3b456;
     --gold-soft: #33280f;
     --danger: #ff6b5e;
@@ -101,6 +101,15 @@ main { padding: 0 16px 16px; }
 .menu .ico.green { background: var(--accent); color: var(--accent-ink); }
 .menu .ico.gold { background: var(--gold); color: #fff; }
 .menu .ico.blue { background: #3a78c2; color: #fff; }
+.menu .ico.v-catering { background: rgb(var(--v-catering)); color: var(--accent-ink); }
+.menu .ico.v-zona7 { background: rgb(var(--v-zona7)); color: var(--accent-ink); }
+.menu .ico.v-luma { background: rgb(var(--v-luma)); color: var(--accent-ink); }
+.menu .ico.v-zona7 svg { width: 22px; height: 22px; }
+/* pločice (sale u Kalendaru): do 4 u redu, ostatak u novi red */
+.menu.tiles { display: flex; flex-wrap: wrap; gap: 10px; }
+.menu.tiles button { flex: 1 1 calc(25% - 8px); min-width: calc(25% - 8px); min-height: 0; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; padding: 14px 6px 12px; text-align: center; }
+.menu.tiles .name { font-size: 15px; line-height: 1.15; }
+.menu.tiles .sub { font-size: 12px; margin-top: 0; }
 .menu .txt { flex: 1; min-width: 0; }
 .menu .name { display: block; font-size: 19px; font-weight: 700; }
 .menu .sub { display: block; font-size: 14px; color: var(--muted); margin-top: 2px; }
@@ -186,7 +195,8 @@ main { padding: 0 16px 16px; }
 .hero .bigdate { font-size: 28px; font-weight: 800; letter-spacing: -.4px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 20px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 15px; }
-.chip svg { width: 16px; height: 16px; }
+.chip svg { width: 16px; height: 16px; flex: none; }
+.chip.loc { max-width: 100%; white-space: normal; text-align: left; }
 .detail { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
 .detail .item { padding: 13px 16px; }
 .detail .item + .item { border-top: 1px solid var(--line); }
@@ -274,10 +284,11 @@ input[type=checkbox] { width: 24px; height: 24px; padding: 0; box-shadow: none; 
 .login-hero { padding: 34px 20px 26px; margin-bottom: 28px; }
 .login-hero .logo { width: 210px; max-width: 80%; height: auto; }
 .login-hero .brand-sub { color: rgba(255,255,255,.75); margin: 12px 0 0; }
-.home-hero { padding: 22px 20px 18px; margin: 4px 0 18px; align-items: flex-start; }
-.home-hero .logo { width: 150px; height: auto; }
-.home-hero .hello { margin-top: 10px; font-size: 22px; font-weight: 700; }
-.login-hero::after, .home-hero::after { content: ""; display: block; width: 36px; height: 3px; border-radius: 2px; background: var(--gold); margin-top: 14px; }
+/* Početni ekran: logo Nerotta d.o.o. (tamno siva + zlatna iz loga) */
+.home-hero { background: #353535; flex-direction: row; align-items: center; gap: 18px; padding: 16px 20px; margin: 4px 0 18px; }
+.home-hero .logo { width: auto; height: 96px; }
+.home-hero .hello { font-size: 22px; font-weight: 700; }
+.login-hero::after { content: ""; display: block; width: 36px; height: 3px; border-radius: 2px; background: var(--gold); margin-top: 14px; }
 .catpick { display: flex; flex-wrap: wrap; gap: 8px; }
 .catchip { display: inline-flex; padding: 0; margin: 0; cursor: pointer; }
 .catchip > * { margin-left: 0; }
