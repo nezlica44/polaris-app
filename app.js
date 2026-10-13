@@ -61,6 +61,8 @@ const ICON = {
 // znakovi sala: Polaris (sazviježđe iz print kita), Zona 7 (znak 7Z s bannera), Sala Luma (sunce iz loga)
 ICON.polaris = '<svg viewBox="0 0 13.69 22.49"><path d="M7.09 7 L6.81 7.37 M5.86 9.08 L5.33 10.49 M4.84 12.39 L4.61 14 M3.71 15.6 L2.57 16.54 M2.03 18.23 L2.48 19.85 M3.5 20.16 L4.78 19.08 M5.25 17.5 L4.77 15.92" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"></path><path d="M8.32 5.48 L12.69 5.36 L8.32 5.25 Z" fill="currentColor"></path><path d="M8.21 5.36 L8.32 9.73 L8.43 5.36 Z" fill="currentColor"></path><path d="M8.32 5.25 L3.96 5.36 L8.32 5.48 Z" fill="currentColor"></path><path d="M8.43 5.36 L8.32 1 L8.21 5.36 Z" fill="currentColor"></path><path d="M8.32 3.61 L8.64 5.05 L10.07 5.36 L8.64 5.68 L8.32 7.12 L8 5.68 L6.57 5.36 L8 5.05 Z" fill="currentColor"></path><path d="M8.32 4.7 L8.45 5.24 L8.99 5.36 L8.45 5.49 L8.32 6.03 L8.19 5.49 L7.65 5.36 L8.19 5.24 Z" fill="currentColor"></path><path d="M6.21 7.47 L6.34 8.03 L6.9 8.15 L6.34 8.28 L6.21 8.84 L6.09 8.28 L5.53 8.15 L6.09 8.03 Z" fill="currentColor"></path><path d="M4.97 10.72 L5.1 11.28 L5.66 11.41 L5.1 11.53 L4.97 12.1 L4.85 11.53 L4.29 11.41 L4.85 11.28 Z" fill="currentColor"></path><path d="M4.48 14.29 L4.6 14.85 L5.17 14.97 L4.6 15.1 L4.48 15.66 L4.35 15.1 L3.79 14.97 L4.35 14.85 Z" fill="currentColor"></path><path d="M1.75 16.46 L1.89 17.07 L2.5 17.21 L1.89 17.34 L1.75 17.96 L1.61 17.34 L1 17.21 L1.61 17.07 Z" fill="currentColor"></path><path d="M2.74 20.12 L2.87 20.68 L3.43 20.8 L2.87 20.93 L2.74 21.49 L2.62 20.93 L2.05 20.8 L2.62 20.68 Z" fill="currentColor"></path><path d="M5.53 17.76 L5.66 18.32 L6.22 18.45 L5.66 18.57 L5.53 19.13 L5.41 18.57 L4.84 18.45 L5.41 18.32 Z" fill="currentColor"></path></svg>';
 ICON.z7 = '<svg viewBox="-96 30 830 830" fill="currentColor"><path d="M48 180H430L48 840V719L319 250H48Z"/><path d="M590 50V175L319 650H590V715H210Z"/></svg>';
+ICON.chart = svg('<path d="M3 3v18h18"/><path d="M7 15l4-4 4 3 5-6"/>');
+ICON.upload = svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>');
 ICON.camera = svg('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>');
 ICON.sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5.5 15.5a6.5 6.5 0 0 1 13 0"/><path d="M20.6 15.5L23.4 15.5M19.4 11.2L21.0 10.3M16.3 8.1L17.7 5.6M12.0 6.9L12.0 5.1M7.7 8.1L6.3 5.6M4.6 11.2L3.0 10.3M3.4 15.5L0.6 15.5M3 18.5h18"/></svg>';
 const LOGO = '<img src="polaris-logo.png" alt="Polaris" class="logo" onerror="this.remove()">';
@@ -297,6 +299,7 @@ function liveRefreshable() {
   if (['', 'kalendar', 'radnje', 'obavijesti'].includes(a)) return true;
   if (VENUES[a]) return !['new', 'pregled'].includes(p[1]) && !['edit', 'gotovo', 'kuhinja'].includes(p[2]);
   if (a === 'todo') return !p[1];
+  if (a === 'statistika') return p[2] !== 'upload';
   return false;
 }
 const liveSoon = () => { clearTimeout(liveT); liveT = setTimeout(liveRefresh, 500); };
@@ -334,6 +337,7 @@ async function renderHome() {
         <div class="menu">
           ${menuBtn('/kalendar', 'calendar', 'green', 'Kalendar', cat)}
           ${menuBtn('/restoran', 'utensils', 'green', 'Polaris', 'Jelovnik, normativ, nabavka')}
+          ${menuBtn('/statistika', 'chart', 'green', 'Statistika', 'Promet po salama, kasa')}
           ${menuBtn('/todo', 'todo', 'green', 'To-do', todo)}
         </div>
         <div id="pushask"></div>
@@ -1151,6 +1155,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
             }).join('')}</div>`).join('')}
           <label style="margin-top:14px">Cijena po osobi (€)<input name="price_per_person" inputmode="decimal" value="${esc(c.price_per_person)}" placeholder="koliko naplaćuješ po osobi"></label>
         </div>
+        <label>Dogovorena cijena ukupno (€)<input name="price" inputmode="decimal" value="${esc(c.price)}" placeholder="prazno = po cjeniku paketa"></label>
         <div ${dom ? 'hidden' : ''}>
         <div class="ftitle">Dodatno</div>
         <div class="xopts">
@@ -1264,6 +1269,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
       people: s.people, location: val(f, 'location'), contact: val(f, 'contact'),
       description: val(f, 'description'), platters: null, extras: null,
       package: s.package, custom: s.custom, price_per_person: s.price_per_person, cutlery: s.cutlery, plates: s.plates, glasses: s.glasses, ice: s.ice, tables: s.tables, bar_tables: s.bar_tables,
+      price: (() => { const p = numVal(f, 'price'); return p != null && !isNaN(p) ? p : null; })(),
     };
     if (id) {
       // postojeći catering se sprema odmah, pretpregled je samo kod prvog dodavanja
@@ -1284,7 +1290,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
 
 const cateringRow = (c) => ({
   venue: VENUES[c.venue]?.cat ? c.venue : 'catering', title: c.title, event_date: c.event_date, event_time: c.event_time, ready_time: c.ready_time || null, people: c.people, location: c.location, contact: c.contact,
-  description: c.description, platters: null, extras: null, package: c.package, custom: c.custom, price_per_person: c.price_per_person,
+  description: c.description, platters: null, extras: null, package: c.package, custom: c.custom, price_per_person: c.price_per_person, price: c.price ?? null,
   cutlery: !!c.cutlery, plates: !!c.plates, glasses: !!c.glasses, ice: !!c.ice, tables: c.tables || 0, bar_tables: c.bar_tables || 0,
 });
 
@@ -1402,6 +1408,7 @@ async function renderEventForm(venue, id, params) {
           <label>Do kada (npr. 03:00)<input name="end_time" type="time" value="${esc(e.end_time?.slice(0, 5))}"></label>
         </div>
         <label>Kontakt<input name="contact" value="${esc(e.contact)}" placeholder="ime i broj mobitela"></label>
+        <label>Dogovorena cijena (€, za statistiku)<input name="price" inputmode="decimal" value="${esc(e.price)}" placeholder="npr. 1500"></label>
         <label>Napomene<textarea name="description" placeholder="torta, glazba, posebne želje…">${esc(e.description)}</textarea></label>
         <div class="ftitle">Catering</div>
         <div id="catbox">
@@ -1419,7 +1426,7 @@ async function renderEventForm(venue, id, params) {
   const snapshot = () => ({
     ...e, _route: route, venue, id: id || null,
     title: val(f, 'title'), people: numVal(f, 'people'), event_date: val(f, 'event_date'), start_time: val(f, 'start_time'), end_time: val(f, 'end_time'),
-    contact: val(f, 'contact'), description: val(f, 'description'),
+    contact: val(f, 'contact'), description: val(f, 'description'), price: numVal(f, 'price'),
   });
   const addcat = document.getElementById('addcat');
   if (addcat) addcat.onclick = () => { eDraft = snapshot(); cDraft = null; keepDraft(route); go('/catering/new?ev=1'); };
@@ -1446,7 +1453,7 @@ async function renderEventForm(venue, id, params) {
         e.catering = null; e.catering_id = catering_id; s.catering = null; s.catering_id = catering_id;
         eDraft = { ...s }; catSaved = true;
       }
-      const row = { venue, title: s.title, people: s.people, event_date: s.event_date, start_time: s.start_time, end_time: s.end_time, contact: s.contact, description: s.description, catering_id };
+      const row = { venue, title: s.title, people: s.people, event_date: s.event_date, start_time: s.start_time, end_time: s.end_time, contact: s.contact, description: s.description, price: s.price != null && !isNaN(s.price) ? s.price : null, catering_id };
       let eid = id;
       if (id) await q(sb.from('events').update(row).eq('id', id));
       else { eid = (await q(sb.from('events').insert(row).select('id').single())).id; flushPush(); }
@@ -1827,6 +1834,415 @@ async function renderReceipts() {
         ${rest.length ? `<div class="group">${rest.map(cell).join('')}</div>` : '<div class="empty">Još nema slikanih računa.<br>Slikaj račun u dobavljaču ili ovdje.</div>'}`,
     });
   } catch (e) { if (!stale(my)) failed('Slikani računi', '/nabavka', e); }
+}
+
+/* ---------- STATISTIKA: promet po salama (iz cateringa i evenata), izvoz prodaje s kase, učitane datoteke ---------- */
+let statYM = null, statMode = 'month'; // 'month' | 'year'
+const KASA = { name: 'Polaris kasa', short: 'Kasa', icon: 'utensils', color: 'green', path: '/statistika/kasa' };
+const catRevenue = (c) => (c.price != null ? Number(c.price) : !PACKAGES[c.package] && !c.custom ? null : Number(cateringCalc(c).total) || 0);
+const evRevenue = (e) => (e.price != null ? Number(e.price) : null);
+const kfmt = (n) => (n >= 10000 ? `${num(n / 1000, 0)}k` : n >= 1000 ? `${num(n / 1000, 1)}k` : num(n, 0));
+const lastDay = (y, m) => new Date(y, m, 0).getDate();
+// razdoblje prema statYM i statMode: [od, do, broj dana]
+function statPeriod() {
+  if (!statYM) statYM = ym(todayStr());
+  const [y, m] = statYM.split('-').map(Number);
+  if (statMode === 'year') return { from: `${y}-01-01`, to: `${y}-12-31`, days: (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 366 : 365, label: String(y), y, m };
+  return { from: `${statYM}-01`, to: `${statYM}-${String(lastDay(y, m)).padStart(2, '0')}`, days: lastDay(y, m), label: `${MONTHS_N[m - 1]} ${y}`, y, m };
+}
+const statNavHtml = (P) => `
+  <div class="calhead statnav">
+    <button type="button" class="tap" data-stat="-1" aria-label="Prethodno">${ICON.back}</button>
+    <div class="calmonth">${P.label}</div>
+    <button type="button" class="tap" data-stat="1" aria-label="Sljedeće">${ICON.chev}</button>
+  </div>
+  <div class="seg small ${statMode === 'year' ? 'right' : ''}">
+    <button type="button" data-mode="month" class="${statMode === 'month' ? 'on' : ''}">Mjesec</button>
+    <button type="button" data-mode="year" class="${statMode === 'year' ? 'on' : ''}">Godina</button>
+  </div>`;
+function bindStatNav(redraw) {
+  const nav = app.querySelector('.statnav'); const seg = app.querySelector('.seg');
+  if (nav) nav.onclick = (e) => {
+    const b = e.target.closest('[data-stat]'); if (!b) return;
+    const [y, m] = statYM.split('-').map(Number);
+    const d = new Date(y, m - 1 + Number(b.dataset.stat) * (statMode === 'year' ? 12 : 1), 1);
+    statYM = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    redraw();
+  };
+  if (seg) seg.onclick = (e) => { const b = e.target.closest('[data-mode]'); if (!b || b.dataset.mode === statMode) return; statMode = b.dataset.mode; redraw(); };
+}
+const kpi = (v, l) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`;
+// mjesečna mreža s iznosom po danu
+function statGrid(P, byDay, color) {
+  const t = todayStr();
+  const first = new Date(P.y, P.m - 1, 1); const offset = (first.getDay() + 6) % 7;
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push('<span class="cday blank"></span>');
+  for (let d = 1; d <= P.days; d++) {
+    const ds = `${statYM}-${String(d).padStart(2, '0')}`; const v = byDay[ds];
+    cells.push(`<span class="cday stat ${ds === t ? 'today' : ''} ${v ? 'busy' : ''}" style="${v ? `background:${color}` : ''}"><b>${d}</b>${v && v.amount > 0 ? `<small>${kfmt(v.amount)}</small>` : ''}</span>`);
+  }
+  return `<div class="cal"><div class="calgrid">${DAYS.slice(1).concat(DAYS[0]).map((w) => `<span class="cw">${w}</span>`).join('')}${cells.join('')}</div></div>`;
+}
+// godišnji pregled po mjesecima
+const yearRows = (P, byMonth, unit) => `<div class="group">${MONTHS_N.map((mn, i) => { const v = byMonth[i + 1]; return `
+  <div class="cell static"><span class="main"><span class="title">${mn}</span><span class="meta">${v ? `${v.n} ${unit(v.n)}${v.people ? ` · ${v.people} osoba` : ''}` : '—'}</span></span><span class="nowrap"><b>${v ? eur(v.amount) : ''}</b></span></div>`; }).join('')}</div>`;
+
+async function loadStatRows() {
+  const [c, e] = await Promise.all([q(sb.from('caterings').select('*')), q(sb.from('events').select('id, venue, event_date, start_time, people, title, price'))]);
+  return [...c.map((x) => ({ ...catRow(x), revenue: catRevenue(x) })), ...e.map((x) => ({ ...evRow(x), revenue: evRevenue(x) }))];
+}
+const loadSalesByDay = (P) => sb.rpc('sales_by_day', { p_from: P.from, p_to: P.to }).then((r) => (r.error ? [] : r.data || []), () => []);
+// zbroj po salama za razdoblje
+function venueSums(rows, P) {
+  const out = {};
+  Object.keys(VENUES).forEach((v) => { out[v] = { n: 0, people: 0, amount: 0, noPrice: 0, days: new Set() }; });
+  rows.filter((r) => r.event_date >= P.from && r.event_date <= P.to).forEach((r) => {
+    const o = out[r.venue]; if (!o) return;
+    o.n++; o.people += Number(r.people) || 0; o.days.add(r.event_date);
+    if (r.revenue == null) o.noPrice++; else o.amount += r.revenue;
+  });
+  return out;
+}
+const pct = (a, b) => (b ? `${num((a / b) * 100, 0)} %` : '—');
+async function renderStats() {
+  const my = loading('Statistika', '/');
+  try {
+    const P = statPeriod();
+    const [rows, sales] = await Promise.all([loadStatRows(), loadSalesByDay(P)]);
+    if (stale(my)) return;
+    const draw = async () => {
+      const P = statPeriod();
+      const sal = (await loadSalesByDay(P)).reduce((s, d) => s + Number(d.amount || 0), 0);
+      const sums = venueSums(rows, P);
+      const total = Object.values(sums).reduce((s, o) => s + o.amount, 0) + sal;
+      const n = Object.values(sums).reduce((s, o) => s + o.n, 0);
+      screen({
+        title: 'Statistika', back: '/',
+        body: `
+          ${statNavHtml(P)}
+          <div class="kpis">${kpi(eur(total), 'prihod ukupno')}${kpi(n, plural(n, 'termin', 'termina', 'termina'))}</div>
+          <div class="menu tiles">${Object.entries(VENUES).map(([v, V]) => tileBtn(`/statistika/${v}`, V.icon, V.color, V.short, eur(sums[v].amount))).join('')}</div>
+          <div class="section-title">${P.label}</div>
+          <div class="group">
+            ${Object.entries(VENUES).map(([v, V]) => { const o = sums[v]; return `
+            <button class="cell" data-go="/statistika/${v}">
+              <span class="vbar" style="background:${vcol(v)}"></span>
+              <span class="main"><span class="title" style="display:block">${esc(V.name)}</span><span class="meta">${o.n} ${plural(o.n, 'termin', 'termina', 'termina')}${o.people ? ` · ${o.people} osoba` : ''} · popunjenost ${pct(o.days.size, P.days)}${o.noPrice ? ` · <span class="overdue">${o.noPrice} bez cijene</span>` : ''}</span></span>
+              <span class="nowrap"><b>${eur(o.amount)}</b></span><span class="chev">${ICON.chev}</span>
+            </button>`; }).join('')}
+            <button class="cell" data-go="/statistika/kasa">
+              <span class="vbar" style="background:var(--accent)"></span>
+              <span class="main"><span class="title" style="display:block">${KASA.name}</span><span class="meta">prodaja u restoranu iz izvoza s kase</span></span>
+              <span class="nowrap"><b>${eur(sal)}</b></span><span class="chev">${ICON.chev}</span>
+            </button>
+          </div>
+          <p class="muted small">Prihod sala = dogovorena cijena eventa ili cateringa (upisuje se u formi); ako nije upisana, catering se računa po cjeniku paketa. Kasa = učitani izvoz prodaje.</p>`,
+      });
+      bindStatNav(draw);
+    };
+    await draw();
+    void sales;
+  } catch (e) { if (!stale(my)) failed('Statistika', '/', e); }
+}
+async function renderVenueStats(venue) {
+  const V = VENUES[venue];
+  const my = loading(V.name, '/statistika');
+  try {
+    const rows = (await loadStatRows()).filter((r) => r.venue === venue);
+    if (stale(my)) return;
+    const unit = (n) => plural(n, V.one, V.one === 'event' ? 'eventa' : V.many, V.many);
+    const draw = () => {
+      const P = statPeriod();
+      const inP = rows.filter((r) => r.event_date >= P.from && r.event_date <= P.to).sort(byTime);
+      const byDay = {}, byMonth = {};
+      inP.forEach((r) => {
+        const d = (byDay[r.event_date] ||= { n: 0, amount: 0, people: 0 }); d.n++; d.amount += r.revenue || 0; d.people += Number(r.people) || 0;
+        const mm = Number(r.event_date.slice(5, 7)); const o = (byMonth[mm] ||= { n: 0, amount: 0, people: 0 }); o.n++; o.amount += r.revenue || 0; o.people += Number(r.people) || 0;
+      });
+      const amount = inP.reduce((s, r) => s + (r.revenue || 0), 0), people = inP.reduce((s, r) => s + (Number(r.people) || 0), 0), noPrice = inP.filter((r) => r.revenue == null).length;
+      screen({
+        title: V.name, back: '/statistika',
+        body: `
+          ${statNavHtml(P)}
+          <div class="kpis">
+            ${kpi(eur(amount), 'prihod')}${kpi(inP.length, unit(inP.length))}
+            ${kpi(pct(Object.keys(byDay).length, P.days), `popunjenost (${Object.keys(byDay).length} od ${P.days} dana)`)}${kpi(people, 'osoba')}
+          </div>
+          ${statMode === 'month' ? statGrid(P, byDay, vcol(venue, 0.34)) : yearRows(P, byMonth, unit)}
+          ${noPrice ? `<p class="muted small"><span class="overdue">${noPrice} bez cijene</span> · upiši dogovorenu cijenu u formi (Uredi) da bi prihod bio točan.</p>` : ''}
+          <div class="section-title">${P.label} · ${inP.length} ${unit(inP.length)}</div>
+          ${inP.length ? `<div class="group">${inP.map((r) => `
+            <button class="cell" data-go="${rowPath(r)}">
+              <span class="main"><span class="title one" style="display:block">${fmtDateShort(r.event_date)} · ${esc(r.title || (r.kind === 'catering' ? r.location : '') || kindName(r))}</span><span class="meta">${[r.people && `${r.people} ${plural(r.people, 'osoba', 'osobe', 'osoba')}`, r.package ? `paket ${r.package}` : r.custom ? 'custom' : ''].filter(Boolean).join(' · ')}</span></span>
+              <span class="nowrap">${r.revenue == null ? '<span class="overdue">bez cijene</span>' : `<b>${eur(r.revenue)}</b>`}</span><span class="chev">${ICON.chev}</span>
+            </button>`).join('')}</div>` : `<div class="empty">Nema ${V.many} u ovom razdoblju.</div>`}`,
+      });
+      bindStatNav(draw);
+    };
+    draw();
+  } catch (e) { if (!stale(my)) failed(V.name, '/statistika', e); }
+}
+async function renderKasa() {
+  const my = loading(KASA.name, '/statistika');
+  try {
+    const draw = async () => {
+      const P = statPeriod();
+      const [days, top, ups] = await Promise.all([
+        loadSalesByDay(P),
+        sb.rpc('sales_top', { p_from: P.from, p_to: P.to, p_limit: 15 }).then((r) => (r.error ? [] : r.data || []), () => []),
+        q(sb.from('uploads').select('id, file_name, rows, from_date, to_date, created_at, creator:profiles(full_name)').eq('kind', 'kasa').order('created_at', { ascending: false }).limit(30)),
+      ]);
+      if (stale(my)) return;
+      const byDay = {}, byMonth = {}; let amount = 0;
+      days.forEach((d) => { byDay[d.sale_date] = { n: Number(d.n), amount: Number(d.amount) || 0 }; amount += Number(d.amount) || 0; const mm = Number(d.sale_date.slice(5, 7)); const o = (byMonth[mm] ||= { n: 0, amount: 0 }); o.n++; o.amount += Number(d.amount) || 0; });
+      const nDays = Object.keys(byDay).length;
+      const maxTop = Math.max(1, ...top.map((t) => Number(t.amount) || 0));
+      screen({
+        title: KASA.name, back: '/statistika',
+        actions: [{ go: '/statistika/kasa/upload', label: 'Učitaj izvoz s kase', icon: 'upload', primary: true }],
+        body: `
+          ${statNavHtml(P)}
+          <div class="kpis">${kpi(eur(amount), 'promet s PDV-om')}${kpi(nDays ? eur(amount / nDays) : '—', 'prosjek po danu')}${kpi(nDays, plural(nDays, 'dan s prodajom', 'dana s prodajom', 'dana s prodajom'))}${kpi(ups.length, plural(ups.length, 'izvoz', 'izvoza', 'izvoza'))}</div>
+          ${statMode === 'month' ? statGrid(P, byDay, 'var(--accent-soft)') : yearRows(P, byMonth, (n) => plural(n, 'dan', 'dana', 'dana'))}
+          <div class="section-title">Najprodavanije · ${P.label}</div>
+          ${top.length ? `<div class="group">${top.map((t) => `
+            <div class="cell static bar" style="--w:${((Number(t.amount) || 0) / maxTop * 100).toFixed(1)}%"><span class="main"><span class="title one" style="display:block">${esc(t.name)}</span><span class="meta">${t.qty != null ? `${num(t.qty, 2)} kom` : ''}</span></span><span class="nowrap"><b>${eur(t.amount)}</b></span></div>`).join('')}</div>` : '<div class="empty">Nema prodaje u ovom razdoblju.<br>Učitaj izvoz s kase (CSV ili Excel).</div>'}
+          <div class="section-title">Učitani izvozi</div>
+          ${ups.length ? `<div class="group">${ups.map((u) => `
+            <div class="cell static"><span class="main"><span class="title one" style="display:block">${esc(u.file_name)}</span><span class="meta">${[u.from_date ? `${fmtDateShort(u.from_date)}${u.to_date && u.to_date !== u.from_date ? ` – ${fmtDateShort(u.to_date)}` : ''}` : '', `${u.rows || 0} redaka`, u.creator?.full_name, fmtStamp(u.created_at)].filter(Boolean).join(' · ')}</span></span>${isSuper() ? `<button type="button" class="link danger" data-rm="${u.id}">Ukloni</button>` : ''}</div>`).join('')}</div>` : '<div class="empty">Još nema učitanih izvoza.</div>'}`,
+      });
+      bindStatNav(draw);
+      app.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = async () => {
+        if (!confirm('Ukloniti ovaj izvoz i njegovu prodaju iz statistike?')) return;
+        try { await q(sb.from('sales').delete().eq('upload_id', b.dataset.rm)); await q(sb.from('uploads').delete().eq('id', b.dataset.rm)); toast('Uklonjeno'); draw(); } catch (e) { toast(errText(e)); }
+      }; });
+    };
+    await draw();
+  } catch (e) { if (!stale(my)) failed(KASA.name, '/statistika', e); }
+}
+
+/* čitanje datoteka: CSV/TXT (UTF-8 ili Windows-1250) i Excel .xlsx (bez knjižnica) */
+async function readText(file) {
+  const buf = await file.arrayBuffer();
+  let t; try { t = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { t = new TextDecoder('windows-1250').decode(buf); }
+  return t.replace(/^﻿/, '');
+}
+function parseDelimited(text) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n').filter((l) => l.trim());
+  const head = lines.slice(0, 20).join('\n');
+  const best = [';', '\t', ',', '|'].map((d) => [d, head.split(d).length - 1]).sort((a, b) => b[1] - a[1])[0];
+  const D = best[1] ? best[0] : ';';
+  return lines.map((l) => {
+    const out = []; let cur = '', qq = false;
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      if (qq) { if (ch === '"') { if (l[i + 1] === '"') { cur += '"'; i++; } else qq = false; } else cur += ch; }
+      else if (ch === '"') qq = true;
+      else if (ch === D) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  });
+}
+async function parseXlsx(buf) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('Ovaj preglednik ne može otvoriti .xlsx; spremi izvoz kao CSV.');
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('Datoteka nije valjani .xlsx.');
+  const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
+  const files = {};
+  for (let i = 0; i < n; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), fn = dv.getUint16(p + 28, true), ex = dv.getUint16(p + 30, true), cm = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    files[new TextDecoder().decode(u8.subarray(p + 46, p + 46 + fn))] = { method, csize, lho };
+    p += 46 + fn + ex + cm;
+  }
+  const read = async (name) => {
+    const f = files[name]; if (!f) return null;
+    const s = f.lho + 30 + dv.getUint16(f.lho + 26, true) + dv.getUint16(f.lho + 28, true);
+    const data = u8.slice(s, s + f.csize);
+    if (f.method === 0) return new TextDecoder().decode(data);
+    return await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  };
+  const xml = (s) => new DOMParser().parseFromString(s, 'application/xml');
+  const ss = []; const ssx = await read('xl/sharedStrings.xml');
+  if (ssx) xml(ssx).querySelectorAll('si').forEach((si) => ss.push([...si.querySelectorAll('t')].map((t) => t.textContent).join('')));
+  const sheet = Object.keys(files).filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
+  const sx = sheet && await read(sheet);
+  if (!sx) throw new Error('U .xlsx nema radnog lista.');
+  const colIdx = (ref) => { let k = 0; for (const ch of ref.replace(/\d+/g, '')) k = k * 26 + (ch.charCodeAt(0) - 64); return k - 1; };
+  const rows = [];
+  xml(sx).querySelectorAll('sheetData > row').forEach((r) => {
+    const row = [];
+    r.querySelectorAll('c').forEach((c) => {
+      const t = c.getAttribute('t'); const v = c.querySelector('v'); const is = c.querySelector('is');
+      let val = v ? v.textContent : is ? is.textContent : '';
+      if (t === 's') val = ss[Number(val)] ?? ''; else if (t === 'b') val = val === '1' ? 'DA' : 'NE';
+      const ref = c.getAttribute('r'); row[ref ? colIdx(ref) : row.length] = String(val).trim();
+    });
+    rows.push(Array.from(row, (x) => x ?? ''));
+  });
+  return rows;
+}
+async function readTable(file) {
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.xlsx') || name.endsWith('.xlsm')) return parseXlsx(await file.arrayBuffer());
+  if (name.endsWith('.xls')) throw new Error('Stari Excel .xls ne mogu pročitati; spremi kao .xlsx ili CSV.');
+  return parseDelimited(await readText(file));
+}
+const toNum = (s) => {
+  if (s == null || s === '') return null;
+  let t = String(s).replace(/[€\s]|EUR|HRK|kn/gi, '');
+  if (t.includes(',') && t.includes('.')) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  else if (t.includes(',')) t = t.replace(',', '.');
+  const n = Number(t); return isNaN(n) ? null : n;
+};
+const toDate = (s) => {
+  if (s == null || s === '') return null;
+  const t = String(s).trim(); let m;
+  if ((m = t.match(/^(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{2,4})/))) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  if ((m = t.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  const n = Number(t);
+  if (n > 20000 && n < 80000) { const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000); return d.toISOString().slice(0, 10); }
+  return null;
+};
+// pogodi stupce po zaglavlju
+function guessCols(headers) {
+  const h = headers.map((x) => norm(x));
+  const find = (re, not) => h.findIndex((x) => re.test(x) && !(not && not.test(x)));
+  const amount = (() => { const a = find(/s pdv|sa pdv|pdv-om|bruto|ukupno/, /bez|neto|net|kol/); return a >= 0 ? a : find(/iznos|total|promet|vrijednost|amount|sum/, /bez|neto|net|kol/); })();
+  return { date: find(/datum|date|^dan/), name: find(/naziv|artikl|proizvod|opis|name|item|jelo/), qty: find(/^kol|kolicina|qty|komad|količina/), amount };
+}
+async function renderKasaUpload() {
+  const back = '/statistika/kasa';
+  screen({
+    title: 'Izvoz s kase', back,
+    body: `
+      <div class="hero">
+        <p style="margin:0 0 12px">Učitaj izvoz prodaje po artiklu s kase (CSV, TXT ili Excel .xlsx). Nakon učitavanja provjeri koji je stupac datum, artikl, količina i iznos, pa spremi.</p>
+        <button class="btn tap" type="button" id="pick">Odaberi datoteku</button>
+      </div>
+      <div id="out"></div>`,
+  });
+  const out = document.getElementById('out');
+  document.getElementById('pick').onclick = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,.txt,.tsv,.xlsx,.xlsm,.xls,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; inp.hidden = true;
+    document.body.appendChild(inp);
+    inp.onchange = async () => {
+      const file = inp.files && inp.files[0]; inp.remove(); if (!file) return;
+      out.innerHTML = '<div class="empty"><div class="spinner"></div>Čitam datoteku…</div>';
+      try {
+        const all = (await readTable(file)).filter((r) => r.some((c) => c !== ''));
+        if (!all.length) throw new Error('Datoteka je prazna.');
+        const width = Math.max(...all.map((r) => r.length));
+        const hasHeader = all[0].filter((c) => c && toNum(c) == null).length >= Math.ceil(width / 2);
+        const headers = hasHeader ? all[0].map((c, i) => c || `Stupac ${i + 1}`) : Array.from({ length: width }, (_, i) => `Stupac ${i + 1}`);
+        const rows = hasHeader ? all.slice(1) : all;
+        const g = guessCols(headers);
+        const opt = (sel, none) => `<option value="">${none}</option>${headers.map((h, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${esc(h)}</option>`).join('')}`;
+        out.innerHTML = `
+          <form id="mapf" novalidate>
+            <div class="section-title">${esc(file.name)} · ${rows.length} redaka</div>
+            <div class="group" style="padding:12px 14px; display:grid; gap:8px">
+              <label>Datum<select name="date">${opt(g.date, 'nema stupca (upiši razdoblje)')}</select></label>
+              <div class="grid2" id="period" ${g.date >= 0 ? 'hidden' : ''}><label>Od<input name="from" type="date" value="${esc(statPeriod().from)}"></label><label>Do<input name="to" type="date" value="${esc(statPeriod().to)}"></label></div>
+              <label>Artikl<select name="name">${opt(g.name, '— odaberi —')}</select></label>
+              <label>Količina<select name="qty">${opt(g.qty, 'nema')}</select></label>
+              <label>Iznos s PDV-om<select name="amount">${opt(g.amount, '— odaberi —')}</select></label>
+            </div>
+            <div class="section-title">Provjera</div>
+            <div class="group" id="prev"></div>
+            <div class="err" id="err"></div>
+            <div class="actions"><button class="btn tap" type="submit" id="save">Spremi u statistiku</button><button class="btn secondary tap" type="button" data-back="${back}">Odustani</button></div>
+          </form>`;
+        const f = document.getElementById('mapf');
+        const mapped = () => {
+          const ci = (k) => { const v = f.elements[k].value; return v === '' ? -1 : Number(v); };
+          const d = ci('date'), nm = ci('name'), qy = ci('qty'), am = ci('amount');
+          const from = val(f, 'from');
+          return rows.map((r) => ({ sale_date: d >= 0 ? toDate(r[d]) : from, name: nm >= 0 ? r[nm] : '', qty: qy >= 0 ? toNum(r[qy]) : null, amount: am >= 0 ? toNum(r[am]) : null }));
+        };
+        const preview = () => {
+          document.getElementById('period').hidden = f.elements.date.value !== '';
+          const m = mapped(); const ok = m.filter((x) => x.name && x.sale_date && x.amount != null);
+          const sum = ok.reduce((s, x) => s + x.amount, 0);
+          document.getElementById('prev').innerHTML = `
+            ${m.slice(0, 5).map((x) => `<div class="cell static"><span class="main"><span class="title one" style="display:block">${esc(x.name || '?')}</span><span class="meta">${x.sale_date || '<span class="overdue">bez datuma</span>'}${x.qty != null ? ` · ${num(x.qty, 2)} kom` : ''}</span></span><span class="nowrap"><b>${x.amount != null ? eur(x.amount) : '<span class="overdue">?</span>'}</b></span></div>`).join('')}
+            <div class="cell static"><span class="main"><span class="title" style="display:block">Ukupno ${ok.length} od ${m.length} redaka</span><span class="meta">${m.length - ok.length ? `${m.length - ok.length} redaka bez naziva, datuma ili iznosa se preskače` : 'sve je čitljivo'}</span></span><span class="nowrap"><b>${eur(sum)}</b></span></div>`;
+          return ok;
+        };
+        f.addEventListener('change', preview); preview();
+        f.onsubmit = async (e) => {
+          e.preventDefault();
+          const err = document.getElementById('err'); err.textContent = '';
+          const ok = preview();
+          if (!ok.length) { err.textContent = 'Odaberi stupce za artikl i iznos (i datum ili razdoblje).'; return; }
+          const btn = document.getElementById('save'); btn.disabled = true; btn.textContent = 'Spremam…';
+          try {
+            const dates = ok.map((x) => x.sale_date).sort();
+            const up = await q(sb.from('uploads').insert({ kind: 'kasa', file_name: file.name, mime: file.type || null, size: file.size, rows: ok.length, from_date: dates[0], to_date: dates[dates.length - 1], preview: { headers, rows: rows.slice(0, 30) } }).select('id').single());
+            const path = `kasa/${up.id}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+            try { await sb.storage.from('files').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: true }); await sb.from('uploads').update({ path }).eq('id', up.id); } catch { /* datoteka nije nužna, podaci su spremljeni */ }
+            for (let i = 0; i < ok.length; i += 500) await q(sb.from('sales').insert(ok.slice(i, i + 500).map((x) => ({ ...x, upload_id: up.id }))));
+            toast(`Spremljeno ${ok.length} redaka`); go(back);
+          } catch (e2) { err.textContent = errText(e2); btn.disabled = false; btn.textContent = 'Spremi u statistiku'; }
+        };
+      } catch (e) { out.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+    };
+    inp.click();
+  };
+}
+// Normativi sa stare kase: super admin privremeno učita datoteke, spremaju se u Storage (files/normativi) s pregledom sadržaja
+async function renderNormativi() {
+  const my = loading('Normativi sa stare kase', '/admin');
+  try {
+    const ups = await q(sb.from('uploads').select('id, file_name, path, size, rows, created_at, creator:profiles(full_name)').eq('kind', 'normativ').order('created_at', { ascending: false }));
+    if (stale(my)) return;
+    screen({
+      title: 'Normativi sa stare kase', back: '/admin',
+      actions: [{ id: 'pick', label: 'Učitaj datoteku', icon: 'upload', primary: true }],
+      body: `
+        <p class="muted small" style="margin:0 0 12px">Učitaj datoteke normativa iz stare kase (bilo koji format). Spremaju se kako jesu, pa ih kasnije pretvaramo u normative u Jelovniku.</p>
+        ${ups.length ? `<div class="group">${ups.map((u) => `
+          <div class="cell static"><span class="main"><span class="title one" style="display:block">${esc(u.file_name)}</span><span class="meta">${[u.size ? `${num(u.size / 1024, 0)} KB` : '', u.rows ? `${u.rows} redaka` : '', u.creator?.full_name, fmtStamp(u.created_at)].filter(Boolean).join(' · ')}</span></span>${u.path ? `<button type="button" class="link" data-dl="${esc(u.path)}">Preuzmi</button>` : ''}</div>`).join('')}</div>` : '<div class="empty">Još nema učitanih datoteka.</div>'}`,
+    });
+    document.getElementById('pick').onclick = () => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.hidden = true; document.body.appendChild(inp);
+      inp.onchange = async () => {
+        const files = [...(inp.files || [])]; inp.remove(); if (!files.length) return;
+        toast(`Učitavam ${files.length} ${plural(files.length, 'datoteku', 'datoteke', 'datoteka')}…`);
+        let okN = 0;
+        for (const file of files) {
+          try {
+            let preview = null, rows = null;
+            try {
+              const nm = file.name.toLowerCase();
+              if (/\.(xlsx|xlsm|csv|txt|tsv|xml|json|html?)$/.test(nm) && file.size < 8_000_000) {
+                const t = nm.endsWith('.xlsx') || nm.endsWith('.xlsm') ? await parseXlsx(await file.arrayBuffer()) : parseDelimited(await readText(file));
+                rows = t.length; preview = { rows: t.slice(0, 40).map((r) => r.slice(0, 12)) };
+              }
+            } catch { /* pregled nije nužan */ }
+            const path = `normativi/${Date.now()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+            const { error } = await sb.storage.from('files').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: true });
+            if (error) throw error;
+            await q(sb.from('uploads').insert({ kind: 'normativ', file_name: file.name, path, mime: file.type || null, size: file.size, rows, preview }));
+            okN++;
+          } catch (e) { toast(`${file.name}: ${errText(e)}`); }
+        }
+        if (okN) { toast(`Učitano ${okN}`); renderNormativi(); }
+      };
+      inp.click();
+    };
+    app.querySelectorAll('[data-dl]').forEach((b) => { b.onclick = async () => {
+      const { data, error } = await sb.storage.from('files').createSignedUrl(b.dataset.dl, 300);
+      if (error || !data?.signedUrl) { toast(errText(error || new Error('Nema poveznice'))); return; }
+      window.open(data.signedUrl, '_blank');
+    }; });
+  } catch (e) { if (!stale(my)) failed('Normativi sa stare kase', '/admin', e); }
 }
 
 /* ---------- JELOVNIK: normativ, recept, food cost ---------- */
@@ -2354,6 +2770,7 @@ function renderAdmin() {
     body: `<div class="menu">
       ${menuBtn('/korisnici', 'users', 'green', 'Korisnici', 'Računi, uloge, PIN-ovi')}
       ${menuBtn('/radnje', 'activity', 'green', 'Radnje', 'Što se zadnje mijenjalo')}
+      ${menuBtn('/normativi', 'upload', 'green', 'Normativi sa stare kase', 'Privremeno učitavanje datoteka')}
     </div>`,
   });
 }
@@ -2521,6 +2938,11 @@ async function dispatch(p, params) {
       if (!NCATS[p[1]]) return renderSupplier(p[1]); // stara poveznica bez kategorije
       return p[2] ? renderSupplier(p[2], p[1]) : renderNabCategory(p[1]);
     case 'artikli': return renderAllItems();
+    case 'statistika':
+      if (!p[1]) return renderStats();
+      if (p[1] === 'kasa') return p[2] === 'upload' ? renderKasaUpload() : renderKasa();
+      return VENUES[p[1]] ? renderVenueStats(p[1]) : renderStats();
+    case 'normativi': return isSuper() ? renderNormativi() : renderHome();
     case 'racun': return renderReceiptReview(null);
     case 'racuni': return p[1] ? renderReceiptReview(p[1]) : renderReceipts();
     case 'dobavljac': return renderSupplierForm(p[1] === 'new' ? null : p[1], NCATS[params.get('c')] ? params.get('c') : null);
