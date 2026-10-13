@@ -287,7 +287,7 @@ function liveRefreshable() {
   const [path] = location.hash.slice(1).split('?');
   const p = (path || '/').split('/').filter(Boolean); const a = p[0] || '';
   if (['', 'kalendar', 'radnje', 'obavijesti'].includes(a)) return true;
-  if (VENUES[a]) return !['new', 'pregled'].includes(p[1]) && p[2] !== 'edit';
+  if (VENUES[a]) return !['new', 'pregled'].includes(p[1]) && !['edit', 'gotovo', 'kuhinja'].includes(p[2]);
   if (a === 'todo') return !p[1];
   return false;
 }
@@ -886,6 +886,7 @@ function cateringHero(c, extraChips = '') {
       <div class="chips">
         ${PACKAGES[c.package] ? `<span class="chip gold">Paket ${c.package}</span>` : customList ? '<span class="chip gold">Custom domjenak</span>' : ''}
         ${c.event_time ? `<span class="chip">${ICON.clock}${fmtTime(c.event_time)}</span>` : ''}
+        ${c.ready_time ? `<span class="chip">${ICON.check}spremno ${fmtTime(c.ready_time)}</span>` : ''}
         ${c.people ? `<span class="chip">${ICON.people}${c.people} ${plural(c.people, 'osoba', 'osobe', 'osoba')}</span>` : ''}
         ${c.location ? `<span class="chip loc">${ICON.pin}${esc(c.location)}</span>` : ''}
         ${c.cutlery ? '<span class="chip">Beštek</span>' : ''}${c.plates ? '<span class="chip">Tanjuri</span>' : ''}${c.glasses ? '<span class="chip">Čaše</span>' : ''}${c.ice ? '<span class="chip">Led</span>' : ''}
@@ -916,6 +917,7 @@ async function renderCateringDetail(id, venue = 'catering') {
         ${cateringHero(c, (ev ? `<button class="chip link tap" data-go="${VENUES[ev.venue].path}/${ev.id}">${esc(VENUES[ev.venue].short)}: ${esc(ev.title || 'event')}${ICON.chev}</button>` : '') + (c.creator ? `<span class="chip who">${esc(firstName(c.creator))}</span>` : ''))}
         ${parts.take}${parts.pay}${parts.buy}
         <div class="actions">
+          <button class="btn secondary tap" data-go="${V.path}/${c.id}/kuhinja">Lista za kuhinju</button>
           <button class="btn secondary tap" data-go="${V.path}/${c.id}/edit">Uredi</button>
           <button class="btn danger" id="del">Obriši ${V.one}</button>
         </div>`,
@@ -928,6 +930,147 @@ async function renderCateringDetail(id, venue = 'catering') {
       } catch (e) { toast(errText(e)); }
     };
   } catch (e) { if (!stale(my)) failed(V.short, V.path, e); }
+}
+
+/* ---------- LISTA ZA KUHINJU: isti kalkulator bez cijena i boja (ispis, e-mail, dijeljenje) ---------- */
+const KITCHEN_EMAIL_KEY = 'polaris-kitchen-email';
+// iz HTML-a kalkulatora miče cijene (span.cost, Ukupno, napomena o cijenama, "… · 12,34 €")
+const stripPrices = (h) => (h || '')
+  .replace(/<span class="cost">[^<]*<\/span>/g, '')
+  .replace(/<div class="krow total">[\s\S]*?<\/div>/g, '')
+  .replace(/<div class="knote">[\s\S]*?<\/div>/g, '')
+  .replace(/<div class="section-title">[^<]*<\/div>/g, '')
+  .replace(/(\s*·)?\s*≈?\s*\d[\d.]*,\d\d\s*€(\s*po vreći,)?/g, '');
+const kitchenWhere = (c) => c.location || (c.venue === 'domjenak' ? 'Restoran Polaris' : '');
+const kitchenWhat = (c) => {
+  const items = selectedItems(c);
+  const list = !PACKAGES[c.package] && items.length ? items.map((k) => FOOD[k].name).join(', ') : '';
+  return `${PACKAGES[c.package] ? `Paket ${c.package}` : 'Custom domjenak'} · ${c.people || 0} ${plural(c.people || 0, 'osoba', 'osobe', 'osoba')}${list ? ` · ${list}` : ''}`;
+};
+function kitchenHtml(c, parts) {
+  const d = parseDate(c.event_date);
+  const row = (l, v) => (v ? `<div class="kl">${l}</div><div class="kv">${v}</div>` : '');
+  return `
+    <div class="kitchen">
+      <div class="kh">
+        <div class="kl">Kada</div>
+        <div class="kv big">${DAYS_FULL[d.getDay()]}, ${fmtDateShort(c.event_date)}${c.ready_time ? ` · spremno u ${fmtTime(c.ready_time)}` : ''}${c.event_time ? `<small>početak ${fmtTime(c.event_time)}</small>` : ''}</div>
+        ${row('Gdje', esc(kitchenWhere(c)))}
+        ${row('Kontakt', esc(c.contact))}
+        ${row('Što', esc(kitchenWhat(c)))}
+        ${row('Napomene', esc(c.description))}
+      </div>
+      ${parts.take ? `<h2>Za ponijeti</h2>${stripPrices(parts.take)}` : ''}
+      ${parts.buy ? `<h2>Pripremiti i kupiti</h2>${stripPrices(parts.buy)}` : ''}
+    </div>`;
+}
+// čisti tekst iste liste (e-mail, WhatsApp, Viber)
+function kitchenText(c, parts) {
+  const d = parseDate(c.event_date);
+  const L = [
+    `KADA: ${DAYS_FULL[d.getDay()]}, ${fmtDateShort(c.event_date)}${c.ready_time ? ` · spremno u ${fmtTime(c.ready_time)}` : ''}${c.event_time ? ` (početak ${fmtTime(c.event_time)})` : ''}`,
+    kitchenWhere(c) && `GDJE: ${kitchenWhere(c)}`,
+    c.contact && `KONTAKT: ${c.contact}`,
+    `ŠTO: ${kitchenWhat(c)}`,
+    c.description && `NAPOMENE: ${c.description}`,
+  ].filter(Boolean);
+  const own = (el) => [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
+  const section = (title, h) => {
+    if (!h) return;
+    const root = new DOMParser().parseFromString(`<div>${stripPrices(h)}</div>`, 'text/html').body;
+    const out = [];
+    root.querySelectorAll('.tile').forEach((t) => out.push(`- ${t.querySelector('b').textContent} ${t.querySelector('span').textContent}${t.querySelector('small') ? ` (${t.querySelector('small').textContent})` : ''}`));
+    root.querySelectorAll('.kgroup').forEach((g) => {
+      const [t, r] = [...g.querySelectorAll('.khead span')].map((s) => s.textContent.trim());
+      out.push(`${t.toUpperCase()}${r ? ` · ${r}` : ''}`);
+      g.querySelectorAll('.krow').forEach((x) => {
+        if (x.classList.contains('head')) return;
+        const name = own(x.firstElementChild); const sub = x.querySelector('.sub')?.textContent.trim();
+        const prep = x.querySelector('.c1')?.textContent.trim(); const buy = x.querySelector('.c2')?.textContent.trim(); const v = x.querySelector('.v')?.textContent.trim();
+        const qty = prep ? [prep, buy && buy !== prep ? `kupiti ${buy}` : ''].filter(Boolean).join(', ') : v || buy || '';
+        out.push(`- ${name}: ${qty}${sub ? ` (${sub})` : ''}`);
+      });
+    });
+    if (out.length) L.push('', title.toUpperCase(), ...out);
+  };
+  section('Za ponijeti', parts.take);
+  section('Pripremiti i kupiti', parts.buy);
+  return L.join('\n');
+}
+const kitchenSubject = (c) => `${kindName(c)}: ${c.title || ''} ${fmtDateShort(c.event_date)}${c.ready_time ? ` · spremno u ${fmtTime(c.ready_time)}` : ''}`.replace(/\s+/g, ' ').trim();
+const mailtoHref = (to, c, text) => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(kitchenSubject(c))}&body=${encodeURIComponent(text)}`;
+async function shareKitchen(c, text) {
+  const title = kitchenSubject(c);
+  try {
+    if (navigator.share) { await navigator.share({ title, text }); return; }
+    await navigator.clipboard.writeText(`${title}\n\n${text}`); toast('Lista je kopirana, zalijepi je u poruku');
+  } catch (e) { if (e?.name !== 'AbortError') toast('Dijeljenje nije uspjelo'); }
+}
+async function loadCateringFull(id) {
+  const [c, items] = await Promise.all([q(sb.from('caterings').select('*').eq('id', id).single()), loadItems()]);
+  return { c, parts: calcParts(costCalc(cateringCalc(c), items)) };
+}
+async function renderKitchenList(id, venue) {
+  let V = VENUES[venue] || VENUES.catering;
+  const my = loading('Lista za kuhinju', `${V.path}/${id}`);
+  try {
+    const { c, parts } = await loadCateringFull(id);
+    if (stale(my)) return;
+    V = VENUES[c.venue] || V;
+    const text = kitchenText(c, parts);
+    const to = localStorage.getItem(KITCHEN_EMAIL_KEY) || '';
+    screen({
+      title: 'Lista za kuhinju', back: `${V.path}/${id}`,
+      body: `
+        <p class="muted small noprint" style="margin:0 4px 10px">Bez cijena, za kuhare. Ispiši, podijeli ili pošalji e-mailom.</p>
+        ${kitchenHtml(c, parts)}
+        <div class="actions noprint">
+          <button class="btn tap" id="share">Podijeli</button>
+          <button class="btn secondary tap" id="print">Ispiši / PDF</button>
+          <a class="btn secondary tap" id="mailto" href="${mailtoHref(to, c, text)}">Pošalji e-mailom</a>
+        </div>`,
+    });
+    document.getElementById('share').onclick = () => shareKitchen(c, text);
+    document.getElementById('print').onclick = () => window.print();
+  } catch (e) { if (!stale(my)) failed('Lista za kuhinju', `${V.path}/${id}`, e); }
+}
+// nakon potvrde novog cateringa/domjenka: potvrda i slanje liste kuhinji
+async function renderCateringDone(id, venue) {
+  let V = VENUES[venue] || VENUES.catering;
+  const my = loading('Uspješno dodano', `${V.path}/${id}`);
+  try {
+    const { c, parts } = await loadCateringFull(id);
+    if (stale(my)) return;
+    V = VENUES[c.venue] || V;
+    const text = kitchenText(c, parts);
+    const saved = localStorage.getItem(KITCHEN_EMAIL_KEY) || '';
+    screen({
+      title: '', hideTitle: true, back: `${V.path}/${id}`,
+      body: `
+        <div class="done">
+          <span class="okmark">${ICON.check}</span>
+          <h1>Uspješno dodano.</h1>
+          <p class="muted">${esc(c.title || kindName(c))} · ${fmtDateShort(c.event_date)}${c.event_time ? ` u ${fmtTime(c.event_time)}` : ''}${c.ready_time ? ` · spremno u ${fmtTime(c.ready_time)}` : ''}</p>
+        </div>
+        <div class="section-title">Lista za kuhinju (bez cijena)</div>
+        <form id="mailf" class="kcard" style="padding:14px 16px" novalidate>
+          <label>E-mail kuhinje<input name="email" type="email" inputmode="email" autocomplete="email" value="${esc(saved)}" placeholder="npr. kuhinja@polaris.hr"></label>
+          <a class="btn tap" id="mailto" href="${mailtoHref(saved, c, text)}">Pošalji e-mailom</a>
+          <p class="muted small" style="margin:10px 0 0">Otvara se tvoja e-mail aplikacija s gotovom listom: kada, gdje, kontakt, za ponijeti i što pripremiti. Bez cijena.</p>
+        </form>
+        <div class="actions">
+          <button class="btn secondary tap" id="share">Podijeli (WhatsApp, Viber…)</button>
+          <button class="btn secondary tap" data-go="${V.path}/${id}/kuhinja">Pregled za ispis</button>
+          <button class="btn secondary tap" data-go="${V.path}/${id}">Otvori ${V.one}</button>
+        </div>`,
+    });
+    const f = document.getElementById('mailf'); const a = document.getElementById('mailto');
+    const sync = () => { const to = f.email.value.trim(); a.href = mailtoHref(to, c, text); };
+    f.email.addEventListener('input', sync);
+    a.onclick = () => { const to = f.email.value.trim(); if (to) localStorage.setItem(KITCHEN_EMAIL_KEY, to); };
+    f.onsubmit = (e) => { e.preventDefault(); sync(); a.click(); };
+    document.getElementById('share').onclick = () => shareKitchen(c, text);
+  } catch (e) { if (!stale(my)) failed('Uspješno dodano', `${V.path}/${id}`, e); }
 }
 
 function pkgButton(p, selected) {
@@ -1015,8 +1158,9 @@ async function renderCateringForm(id, params, venue = 'catering') {
         <label>Naziv<input name="title" value="${esc(c.title)}" placeholder="npr. Rođendan Horvat, Bowling"></label>
         <div class="grid2">
           <label>Datum<input name="event_date" type="date" value="${esc(c.event_date)}" required></label>
-          <label>Vrijeme<input name="event_time" type="time" value="${esc(c.event_time?.slice(0, 5))}"></label>
+          <label>Početak<input name="event_time" type="time" value="${esc(c.event_time?.slice(0, 5))}"></label>
         </div>
+        <label>Kada da bude spremno? (za kuhinju)<input name="ready_time" type="time" value="${esc(c.ready_time?.slice(0, 5))}"></label>
         <label>Lokacija<input name="location" value="${esc(c.location)}" placeholder="${dom ? 'npr. velika sala, terasa' : 'npr. Sala Luma, J.J. Strossmayera 271'}"></label>
         <label>Kontakt<input name="contact" value="${esc(c.contact)}" placeholder="ime i broj mobitela"></label>
         <label>Opis i napomene<textarea name="description" style="min-height:120px" placeholder="posebni zahtjevi, alergije, pizze, napomene…">${esc(desc)}</textarea></label>
@@ -1108,7 +1252,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
     if (s.custom && !Object.keys(s.custom).length) { err.textContent = 'Za custom domjenak uključi barem jedno jelo.'; return; }
     const draft = {
       ...c, _route: route, _ev: !!forEvent, _touched: [...touched], id: id || c.id || null,
-      title: val(f, 'title'), event_date: val(f, 'event_date'), event_time: val(f, 'event_time'),
+      title: val(f, 'title'), event_date: val(f, 'event_date'), event_time: val(f, 'event_time'), ready_time: val(f, 'ready_time'),
       people: s.people, location: val(f, 'location'), contact: val(f, 'contact'),
       description: val(f, 'description'), platters: null, extras: null,
       package: s.package, custom: s.custom, price_per_person: s.price_per_person, cutlery: s.cutlery, plates: s.plates, glasses: s.glasses, ice: s.ice, tables: s.tables, bar_tables: s.bar_tables,
@@ -1131,7 +1275,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
 }
 
 const cateringRow = (c) => ({
-  venue: VENUES[c.venue]?.cat ? c.venue : 'catering', title: c.title, event_date: c.event_date, event_time: c.event_time, people: c.people, location: c.location, contact: c.contact,
+  venue: VENUES[c.venue]?.cat ? c.venue : 'catering', title: c.title, event_date: c.event_date, event_time: c.event_time, ready_time: c.ready_time || null, people: c.people, location: c.location, contact: c.contact,
   description: c.description, platters: null, extras: null, package: c.package, custom: c.custom, price_per_person: c.price_per_person,
   cutlery: !!c.cutlery, plates: !!c.plates, glasses: !!c.glasses, ice: !!c.ice, tables: c.tables || 0, bar_tables: c.bar_tables || 0,
 });
@@ -1167,7 +1311,7 @@ async function renderCateringPreview() {
       else { cid = (await q(sb.from('caterings').insert(cateringRow(c)).select('id').single())).id; flushPush(); }
       cDraft = null;
       toast('Spremljeno');
-      if (evRoute) { eDraft.catering_id = cid; eDraft.catering = null; go(evRoute); } else go(`${V.path}/${cid}`);
+      if (evRoute) { eDraft.catering_id = cid; eDraft.catering = null; go(evRoute); } else go(c.id ? `${V.path}/${cid}` : `${V.path}/${cid}/gotovo`);
     } catch (err) { document.getElementById('err').textContent = errText(err); btn.disabled = false; }
   };
   document.getElementById('drop').onclick = () => {
@@ -2166,6 +2310,8 @@ async function dispatch(p, params) {
       if (p[1] === 'new') return renderCateringForm(null, params, p[0]);
       if (p[1] === 'pregled') return renderCateringPreview();
       if (p[2] === 'edit') return renderCateringForm(p[1], params, p[0]);
+      if (p[2] === 'gotovo') return renderCateringDone(p[1], p[0]);
+      if (p[2] === 'kuhinja') return renderKitchenList(p[1], p[0]);
       return renderCateringDetail(p[1], p[0]);
     case 'zona7': case 'luma':
       if (!p[1]) return renderVenueList(p[0]);
