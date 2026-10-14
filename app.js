@@ -137,20 +137,27 @@ document.addEventListener('click', (e) => {
 });
 
 /* ---------- prijava ---------- */
+const APP_VERSION = 23;
+const LAST_USER_KEY = 'polaris.lastUser';
+// hh:mm minus minute (za prijedlog kada hrana treba biti spremna)
+const minusMinutes = (hhmm, m) => { const [h, mi] = hhmm.split(':').map(Number); const t = ((h * 60 + mi - m) % 1440 + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+
 function renderLogin() {
   document.title = 'Polaris';
   document.body.classList.remove('has-fab');
+  const last = localStorage.getItem(LAST_USER_KEY) || '';
   app.innerHTML = `
     <div class="login">
-      <div class="login-hero">${LOGO}<div class="brand-sub">Interna aplikacija</div></div>
+      <div class="login-hero">${LOGO}<div class="brand-sub">Interna aplikacija · v${APP_VERSION}</div></div>
       <form id="f" autocomplete="on">
-        <label>Korisničko ime<input name="u" autocapitalize="none" autocorrect="off" autocomplete="username" required></label>
+        <label>Korisničko ime<input name="u" value="${esc(last)}" autocapitalize="none" autocorrect="off" autocomplete="username" required></label>
         <label>PIN<input name="p" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" required></label>
         <div class="err" id="err"></div>
         <button class="btn tap" type="submit">Prijava</button>
       </form>
     </div>`;
   const f = document.getElementById('f');
+  if (last) f.p.focus(); // ime je zapamćeno, ide se ravno na PIN
   f.onsubmit = async (e) => {
     e.preventDefault();
     const btn = f.querySelector('button'); btn.disabled = true;
@@ -159,6 +166,7 @@ function renderLogin() {
     if (error) { document.getElementById('err').textContent = errText(error); btn.disabled = false; return; }
     await loadMe();
     if (!me) { document.getElementById('err').textContent = 'Račun nije aktivan.'; await sb.auth.signOut(); btn.disabled = false; return; }
+    try { localStorage.setItem(LAST_USER_KEY, f.u.value.trim().toLowerCase()); } catch {}
     location.hash = pendingGo || '#/'; pendingGo = null; route(); flushPush();
   };
 }
@@ -848,7 +856,7 @@ async function renderVenueList(venue) {
     const count = (days) => days.reduce((s, [, ev]) => s + ev.length, 0);
     const list = () => {
       const days = tabs[cateringTab];
-      if (!days.length) return `<div class="empty">${cateringTab === 'past' ? `Nema prošlih ${V.many}.` : `Nema nadolazećih ${V.many}.<br>${V.add} na +`}</div>`;
+      if (!days.length) return `<div class="empty">${cateringTab === 'past' ? `Nema prošlih ${V.many}.` : `Nema nadolazećih ${V.many}.<br>${V.add} gumbom dolje.`}</div>`;
       return `<div class="list">${days.map(([d, ev]) => dayCard(d, ev, cateringTab === 'past')).join('')}</div>`;
     };
     const draw = () => {
@@ -1041,14 +1049,22 @@ async function renderKitchenList(id, venue) {
         <p class="muted small noprint" style="margin:0 4px 10px">Bez cijena, za kuhare. Ispiši, podijeli ili pošalji e-mailom.</p>
         ${kitchenHtml(c, parts)}
         <div class="actions noprint">
-          <button class="btn tap" id="share">Podijeli</button>
+          <button class="btn tap" id="copy">Kopiraj popis</button>
+          <button class="btn secondary tap" id="share">Podijeli (WhatsApp, Viber…)</button>
           <button class="btn secondary tap" id="print">Ispiši / PDF</button>
           <a class="btn secondary tap" id="mailto" href="${mailtoHref(to, c, text)}">Pošalji e-mailom</a>
         </div>`,
     });
+    document.getElementById('copy').onclick = () => copyKitchen(c, text);
     document.getElementById('share').onclick = () => shareKitchen(c, text);
     document.getElementById('print').onclick = () => window.print();
   } catch (e) { if (!stale(my)) failed('Lista za kuhinju', `${V.path}/${id}`, e); }
+}
+// popis za kuhinju u međuspremnik (Viber, WhatsApp): naslov pa detalji
+async function copyKitchen(c, text) {
+  const full = `${kitchenSubject(c)}\n\n${text}`;
+  try { await navigator.clipboard.writeText(full); toast('Popis kopiran, zalijepi ga u poruku'); }
+  catch { const ta = document.createElement('textarea'); ta.value = full; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Popis kopiran'); } catch { toast('Kopiranje nije uspjelo'); } ta.remove(); }
 }
 // nakon potvrde novog cateringa/domjenka: potvrda i slanje liste kuhinji
 async function renderCateringDone(id, venue) {
@@ -1085,11 +1101,7 @@ async function renderCateringDone(id, venue) {
           <button class="link" data-go="${V.path}/${id}">Otvori ${V.one}</button>
         </div>`,
     });
-    document.getElementById('copy').onclick = async () => {
-      const full = `${kitchenSubject(c)}\n\n${text}`;
-      try { await navigator.clipboard.writeText(full); toast('Popis kopiran, zalijepi ga u poruku'); }
-      catch { const ta = document.createElement('textarea'); ta.value = full; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Popis kopiran'); } catch { toast('Kopiranje nije uspjelo'); } ta.remove(); }
-    };
+    document.getElementById('copy').onclick = () => copyKitchen(c, text);
     const f = document.getElementById('mailf'); const a = document.getElementById('mailto');
     const sync = () => { const to = f.email.value.trim(); a.href = mailtoHref(to, c, text); };
     f.email.addEventListener('input', sync);
@@ -1194,7 +1206,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
           <label>Datum<input name="event_date" type="date" value="${esc(c.event_date)}" required></label>
           <label>Početak <i class="req">*</i><input name="event_time" type="time" value="${esc(c.event_time?.slice(0, 5))}"></label>
         </div>
-        <label>Kada da bude spremno? (za kuhinju)<input name="ready_time" type="time" value="${esc(c.ready_time?.slice(0, 5))}"></label>
+        <label>Kada da bude spremno? (kuhinja; ako ne upišeš, ${dom ? '30 min' : '1 h'} prije početka)<input name="ready_time" type="time" value="${esc(c.ready_time?.slice(0, 5))}"></label>
         <label>${dom ? 'Lokacija' : 'Adresa <i class="req">*</i>'}<input name="location" value="${esc(c.location)}" placeholder="${dom ? 'npr. velika sala, terasa' : 'npr. Sala Luma, J.J. Strossmayera 271'}"></label>
         <label>Kontakt<input name="contact" value="${esc(c.contact)}" placeholder="ime i broj mobitela"></label>
         <label>Opis i napomene<textarea name="description" style="min-height:120px" placeholder="posebni zahtjevi, alergije, pizze, napomene…">${esc(desc)}</textarea></label>
@@ -1284,6 +1296,10 @@ async function renderCateringForm(id, params, venue = 'catering') {
     redraw();
   });
   f.price_per_person.addEventListener('input', redraw);
+  // "spremno" prati početak dok ga korisnik sam ne upiše: catering 1 h prije (utovar i put), domjenak 30 min
+  let readyAuto = !f.ready_time.value;
+  f.ready_time.addEventListener('input', () => { readyAuto = !f.ready_time.value; });
+  f.event_time.addEventListener('change', () => { if (readyAuto && f.event_time.value) f.ready_time.value = minusMinutes(f.event_time.value, dom ? 30 : 60); });
   redraw();
   loadItems().then((r) => { items = r; redraw(); });
   f.onsubmit = async (e) => {
@@ -1559,7 +1575,7 @@ async function renderNabCategory(cat) {
             <span class="muted nowrap">${n} ${plural(n, 'artikl', 'artikla', 'artikala')}</span>
             <span class="chev">${ICON.chev}</span>
           </button>`;
-        }).join('')}</div>` : `<div class="empty">Nema dobavljača u ${C.name}.<br>Dodaj na + ili u dobavljaču označi ${C.name}.</div>`}`,
+        }).join('')}</div>` : `<div class="empty">Nema dobavljača u ${C.name}.<br>Dodaj ga gumbom dolje ili postojećem dobavljaču označi ${C.name}.</div>`}`,
     });
   } catch (e) { failed(C.name, '/nabavka', e); }
 }
@@ -1590,7 +1606,7 @@ async function renderSupplier(id, cat) {
           ${s.note ? `<div class="item"><div class="label">Napomena</div><div class="value">${esc(s.note)}</div></div>` : ''}
         </div>` : ''}
         <div class="section-title">${cat ? `${NCATS[cat].name} · ` : ''}Artikli · cijene bez PDV-a</div>
-        ${items.length ? `<div class="group">${items.map((i) => itemCell(i)).join('')}</div>` : '<div class="empty">Nema artikala. Dodaj na +</div>'}
+        ${items.length ? `<div class="group">${items.map((i) => itemCell(i)).join('')}</div>` : '<div class="empty">Nema artikala. Dodaj ih gumbom dolje.</div>'}
         <div class="actions"><button class="btn secondary tap" data-go="/dobavljac/${s.id}/edit${cat ? `?c=${cat}` : ''}">Uredi dobavljača</button></div>`,
     });
   } catch (e) { failed('Dobavljač', back, e); }
@@ -2660,7 +2676,7 @@ function renderScanMenu() {
       const lines = await pdfLines(file);
       if (!lines.length) throw new Error('Ovaj PDF je slika (sken), pa iz njega nema teksta za pročitati. Treba PDF izvezen iz programa u kojem je jelovnik napravljen.');
       const dishes = parseMenuLines(lines);
-      if (!dishes.length) throw new Error('U PDF-u nisam našao jela s cijenama. Jela možeš dodati ručno na +.');
+      if (!dishes.length) throw new Error('U PDF-u nisam našao jela s cijenama. Jela možeš dodati ručno gumbom „Dodaj jelo”.');
       renderScanReview(dishes);
     } catch (e) {
       err.textContent = errText(e);
@@ -2823,7 +2839,8 @@ function renderAdmin() {
       ${menuBtn('/korisnici', 'users', 'green', 'Korisnici', 'Računi, uloge, PIN-ovi')}
       ${menuBtn('/radnje', 'activity', 'green', 'Radnje', 'Što se zadnje mijenjalo')}
       ${menuBtn('/normativi', 'upload', 'green', 'Normativi sa stare kase', 'Privremeno učitavanje datoteka')}
-    </div>`,
+    </div>
+    <p class="muted small" style="text-align:center;margin-top:24px">Polaris v${APP_VERSION}</p>`,
   });
 }
 
@@ -2958,6 +2975,7 @@ function renderMyPin() {
 /* ---------- router ---------- */
 async function route() {
   if (!me) return renderLogin();
+  if (swFresh) { location.reload(); return; } // nova verzija čeka, hash ostaje
   lastRoute = Date.now(); renderSeq++;
   if (!liveCh) startLive();
   const [path, qs] = location.hash.slice(1).split('?');
@@ -3024,8 +3042,17 @@ window.addEventListener('hashchange', route);
 sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') { me = null; stopLive(); renderLogin(); } });
 (async () => { await loadMe(); if (!me && location.hash.length > 2) pendingGo = location.hash; route(); flushPush(); })();
 
+let swFresh = false; // nova verzija aplikacije čeka osvježavanje
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+  // nova verzija je preuzela stranicu: osvježi odmah, osim ako je korisnik usred unosa (onda na sljedećem ekranu)
+  let hadSw = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadSw) { hadSw = true; return; } // prva instalacija, ništa za osvježiti
+    swFresh = true;
+    if (!me || document.querySelector('main form')) { toast('Nova verzija je spremna, učitat će se na sljedećem ekranu'); return; }
+    location.reload();
+  });
   // klik na obavijest dok je aplikacija otvorena: service worker javi kamo otići
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type !== 'go' || typeof e.data.url !== 'string') return;
