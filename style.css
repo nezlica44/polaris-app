@@ -529,3 +529,11 @@ body.has-fab .toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
 .cell.bar > * { position: relative; z-index: 1; }
 .link.danger { color: var(--danger); }
 .req { color: var(--danger); font-style: normal; font-weight: 700; }
+/* Za ponijeti: da/ne oznake i posluživanje */
+.take .flags { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 8px; }
+.take .flag { font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .1); color: rgba(255, 255, 255, .55); }
+.take .flag.on { background: rgba(255, 255, 255, .22); color: #fff; }
+.kitchen .take .flag { background: none; border: 1px solid #999; color: #555; }
+.kitchen .take .flag.on { border-color: #000; color: #000; }
+.seg.serv { margin-top: 4px; }
+.menu.tiles .name { white-space: nowrap; }
