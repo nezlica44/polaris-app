@@ -430,6 +430,11 @@ input[type=number] { -moz-appearance: textfield; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend i { width: 10px; height: 10px; border-radius: 3px; }
+.legend button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.legend button b { font-weight: 700; color: var(--ink); opacity: .65; }
+.legend button.on { background: var(--fill); color: var(--ink); border-color: var(--ink); }
+.legend button.dim { opacity: .4; }
+.legend button.all { color: var(--accent); border-style: dashed; }
 .cell .vbar { flex: none; width: 4px; align-self: stretch; border-radius: 2px; margin: -2px 0; }
 
 /* Custom domjenak: prekidači sa steperom koji se pojavi tek kad je jelo uključeno */

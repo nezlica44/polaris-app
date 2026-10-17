@@ -137,7 +137,7 @@ document.addEventListener('click', (e) => {
 });
 
 /* ---------- prijava ---------- */
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 const LAST_USER_KEY = 'polaris.lastUser';
 // hh:mm minus minute (za prijedlog kada hrana treba biti spremna)
 const minusMinutes = (hhmm, m) => { const [h, mi] = hhmm.split(':').map(Number); const t = ((h * 60 + mi - m) % 1440 + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
@@ -450,6 +450,14 @@ const TORTA_PEOPLE = 8; // 1 torta na 8 osoba
 const ICE_KG = 10, ICE_PEOPLE = 30; // 10 kg leda na 30 osoba, proporcionalno (Nevio 2026-10-14), zaokruženo na cijeli kg
 const ICE_BAG_COST = 10; // € po vreći od 10 kg (minimalna narudžba)
 const pcsPor = (n, key) => Math.max(1, ceil((n * PCS_PER_PERSON) / FOOD[key].pcs)); // porcija pohanog u paketu
+// custom domjenak: količine koje se predlažu po broju ljudi i broju uključenih jela u skupini; Nevio ih mijenja s + i − (2026-10-17)
+const STEPPED = {
+  pcs: (n, key) => pcsPor(n, key),
+  laz: (n) => Math.max(1, ceil((n * LAZ_PER) / LAZ_G)),
+  salad: (n, key, on) => Math.max(1, ceil((n * (on >= 3 ? 3 : 2)) / (on >= 3 ? 12 : 10) / on)),
+  bread: (n, key, on) => Math.max(1, ceil((n * BREAD_PER_10) / 10 / on)),
+};
+const suggestQty = (key, n, on = 1) => STEPPED[FOOD[key].group](n, key, Math.max(1, on));
 
 const split = (total, k) => Array.from({ length: k }, (_, i) => Math.floor(total / k) + (i < total % k ? 1 : 0));
 const ceil = (x) => Math.ceil(x - 1e-9) || 0; // || 0 da ne vrati -0
@@ -478,6 +486,7 @@ function cateringCalc(c) {
   if (k.tables) k.lines.push(['Stol + stolnjak', `${k.tables} × ${eur(EXTRA.table)}`, EXTRA.table * k.tables]);
   if (k.barTables) k.lines.push(['Barski stol + presvlaka', `${k.barTables} × ${eur(EXTRA.barTable)}`, EXTRA.barTable * k.barTables]);
   k.total = k.lines.reduce((s, l) => s + l[2], 0);
+  k.agreed = c.price != null && c.price !== '' && !isNaN(Number(c.price)) ? Number(c.price) : null; // dogovorena ukupna cijena, ako je upisana
   if (k.ice) { k.iceKg = ceil((n * ICE_KG) / ICE_PEOPLE); k.iceBags = ceil(k.iceKg / ICE_KG); k.iceCost = k.iceBags * ICE_BAG_COST; }
   if (!sel.length || !n) return k;
   k.food = true;
@@ -515,23 +524,28 @@ function cateringCalc(c) {
     return row(key, { por, pieces: por * FOOD[key].pcs });
   });
   // lazanjere: 30 g po osobi od svakog, 300 g = 1 lazanjera, barem jedna od svake
+  // u custom domjenku količine lazanjera, salata i lepinjica su upisane s + i −; stari zapisi (true) idu po formuli
+  const fixedCnt = (keys) => (!P && keys.length && keys.every((key) => Number(c.custom?.[key]) > 0) ? keys.map((key) => Number(c.custom[key])) : null);
   const laz = pick('laz');
   if (laz.length) {
-    k.lazanjere = Math.max(laz.length, ceil((n * LAZ_PER * laz.length) / LAZ_G));
-    k.laz = split(k.lazanjere, laz.length).map((cnt, i) => row(laz[i], { cnt, g: cnt * LAZ_G, cost: cnt * FOOD[laz[i]].cost, fixed: true }));
+    const fx = fixedCnt(laz);
+    k.lazanjere = fx ? fx.reduce((a, b) => a + b, 0) : Math.max(laz.length, ceil((n * LAZ_PER * laz.length) / LAZ_G));
+    k.laz = (fx || split(k.lazanjere, laz.length)).map((cnt, i) => row(laz[i], { cnt, g: cnt * LAZ_G, cost: cnt * FOOD[laz[i]].cost, fixed: true }));
   }
   // salate: barem jedna od svake vrste
   const sal = pick('salad');
   if (sal.length) {
+    const fx = fixedCnt(sal);
     const rate = P ? P.saladRate : sal.length >= 3 ? [3, 12] : [2, 10];
-    k.saladN = Math.max(sal.length, ceil((n * rate[0]) / rate[1]));
-    k.salads = split(k.saladN, sal.length).map((cnt, i) => row(sal[i], { cnt }));
+    k.saladN = fx ? fx.reduce((a, b) => a + b, 0) : Math.max(sal.length, ceil((n * rate[0]) / rate[1]));
+    k.salads = (fx || split(k.saladN, sal.length)).map((cnt, i) => row(sal[i], { cnt }));
   }
   // lepinjice: 2 kruga na 10 ljudi, 8 kom u krugu, krugovi se dijele po vrstama
   const br = pick('bread');
   if (br.length) {
-    k.breadN = Math.max(br.length, ceil((n * BREAD_PER_10) / 10));
-    k.breads = split(k.breadN, br.length).map((cnt, i) => row(br[i], { cnt, pieces: cnt * BREAD_PCS, cost: (cnt / BREAD_PORTION) * FOOD[br[i]].cost, fixed: true }));
+    const fx = fixedCnt(br);
+    k.breadN = fx ? fx.reduce((a, b) => a + b, 0) : Math.max(br.length, ceil((n * BREAD_PER_10) / 10));
+    k.breads = (fx || split(k.breadN, br.length)).map((cnt, i) => row(br[i], { cnt, pieces: cnt * BREAD_PCS, cost: (cnt / BREAD_PORTION) * FOOD[br[i]].cost, fixed: true }));
   }
   // juhe: 2,5 dl po osobi ukupno, food cost 1 € po osobi ukupno
   const soups = pick('soup');
@@ -630,7 +644,7 @@ function costCalc(k, items) {
 const sumCost = (rows) => rows.reduce((s, x) => s + (x.cost || 0), 0);
 // Vraća tri dijela (Za ponijeti, Naplatiti, Za kupiti) da ih ekran posloži kako treba
 function calcParts(k) {
-  // Nevio 2026-10-14: u kalkulatoru nema cijena dok se ne sredi baza nabavnih cijena; gore samo brojke i da/ne, detalji dolje
+  // Nevio 2026-10-14: bez nabavnih cijena dok se ne sredi baza; gore samo brojke i da/ne, detalji dolje. 2026-10-17: Naplatiti je vraćeno.
   const krow = (name, v, sub, cls = '') => `<div class="krow ${cls}"><span>${esc(name)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="v">${esc(v)}</span></div>`;
   const group = (title, right, rows, sub) => `<div class="kgroup"><div class="khead"><span>${esc(title)}</span><span>${esc(right)}</span></div>${sub ? `<div class="ksub">${esc(sub)}</div>` : ''}${rows}</div>`;
   const lower = (rows) => rows.filter((x) => x.cnt).map((x) => `${x.short || x.name.replace(' 4 vrste sira', '').toLowerCase()} ${x.cnt}`).join(' · ');
@@ -661,7 +675,14 @@ function calcParts(k) {
       ${tiles.length ? `<div class="tiles">${tiles.map(([n, label]) => `<div class="tile"><b>${esc(n)}</b><span>${esc(label)}</span></div>`).join('')}</div>` : ''}
       ${flags ? `<div class="flags">${flags}</div>` : ''}
     </div>` : '';
-  const pay = '';
+  // Naplatiti (vraćeno 2026-10-17): dogovorena cijena ako je upisana, inače izračun po cjeniku; stavke na dodir
+  const pay = k.lines.length || k.agreed != null ? `
+    <div class="section-title">Naplatiti</div>
+    <details class="kcard pay">
+      <summary><span class="big">${eur(k.agreed != null ? k.agreed : k.total)}</span><span class="more">${k.agreed != null ? 'Dogovoreno' : 'Stavke'}${ICON.chev}</span></summary>
+      ${k.lines.map(([t, sub, v]) => krow(t, eur(v), sub)).join('')}
+      ${k.agreed != null && k.lines.length ? krow('Po cjeniku', eur(k.total), 'paket i dodaci') : ''}
+    </details>` : (k.custom && k.n ? '<div class="section-title">Naplatiti</div><div class="kcard"><div class="knote">Upiši cijenu po osobi ili dogovorenu cijenu da vidiš koliko naplatiti.</div></div>' : '');
   // Za kupiti i pripremiti: dva stupca, bez cijena
   let buy = '';
   if (k.food || k.iceKg || k.cutlery || k.plates || k.glasses || k.tables || k.barTables) {
@@ -758,7 +779,7 @@ async function loadRows(venue) {
 }
 
 // Mjesečni kalendar: kućice obojane bojama sala koje taj dan imaju obaveze, dodir otvara pretpregled dana
-let calYM = null, calDay = null;
+let calYM = null, calDay = null, calFilter = new Set(); // calFilter: sale koje se prikazuju u zajedničkom kalendaru (prazno = sve)
 function renderCal(box, rows, venue) {
   const t = todayStr();
   if (!calYM) calYM = ym(t);
@@ -766,8 +787,10 @@ function renderCal(box, rows, venue) {
   const first = new Date(y, m - 1, 1);
   const days = new Date(y, m, 0).getDate();
   const offset = (first.getDay() + 6) % 7; // tjedan počinje ponedjeljkom
+  const shown = venue || !calFilter.size ? rows : rows.filter((r) => calFilter.has(r.venue));
+  const inMonth = (v) => rows.filter((r) => r.venue === v && r.event_date.startsWith(calYM)).length;
   const byDay = {};
-  rows.forEach((r) => { (byDay[r.event_date] ||= []).push(r); });
+  shown.forEach((r) => { (byDay[r.event_date] ||= []).push(r); });
   // kućica se dijeli na onoliko pruga koliko ima evenata (po vremenu), svaka u boji svoje sale, s tankim razmakom
   const cellStyle = (list) => {
     if (!list.length) return '';
@@ -798,7 +821,7 @@ function renderCal(box, rows, venue) {
         <button type="button" class="tap" data-cal="1" aria-label="Sljedeći mjesec">${ICON.chev}</button>
       </div>
       <div class="calgrid">${DAYS.slice(1).concat(DAYS[0]).map((w) => `<span class="cw">${w}</span>`).join('')}${cells.join('')}</div>
-      ${!venue ? `<div class="legend">${Object.entries(VENUES).map(([v, V]) => `<span><i style="background:${vcol(v)}"></i>${V.short}</span>`).join('')}</div>` : ''}
+      ${!venue ? `<div class="legend">${Object.entries(VENUES).map(([v, V]) => `<button type="button" class="tap ${calFilter.has(v) ? 'on' : calFilter.size ? 'dim' : ''}" data-vf="${v}" aria-pressed="${calFilter.has(v)}"><i style="background:${vcol(v)}"></i>${V.short}<b>${inMonth(v)}</b></button>`).join('')}${calFilter.size ? '<button type="button" class="tap all" data-vf="">Sve</button>' : ''}</div>` : ''}
     </div>
     ${sel ? `
       <div class="section-title">${DAYS_FULL[parseDate(calDay).getDay()]}, ${fmtDateShort(calDay)}</div>
@@ -817,6 +840,14 @@ function renderCal(box, rows, venue) {
     if (nav) {
       const d = new Date(y, m - 1 + Number(nav.dataset.cal), 1);
       calYM = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      renderCal(box, rows, venue);
+      return;
+    }
+    const vf = e.target.closest('[data-vf]'); // legenda pali i gasi sale
+    if (vf) {
+      const v = vf.dataset.vf;
+      if (!v) calFilter.clear(); else if (calFilter.has(v)) calFilter.delete(v); else calFilter.add(v);
+      if (calFilter.size === Object.keys(VENUES).length) calFilter.clear();
       renderCal(box, rows, venue);
       return;
     }
@@ -1130,7 +1161,7 @@ const switchRow = (name, title, sub, on, extra = '') => `
     <input type="checkbox" class="sw" name="${name}" ${on ? 'checked' : ''}>
   </div>`;
 const CUSTOM_SECTIONS = [['Juhe', ['soup']], ['Meso', ['meat']], ['Prilozi', ['side', 'pcs', 'laz']], ['Salate', ['salad']], ['Lepinjice', ['bread']]];
-const customSub = (f) => (f.group === 'pcs' ? `porcija ${f.pcs} kom` : f.group === 'laz' ? '1 porcija' : f.group === 'meat' ? f.sub || `${num(f.piece, 1)} g po komadu` : f.group === 'bread' ? `${BREAD_PCS} kom u krugu` : '');
+const customSub = (f) => (f.group === 'pcs' ? `porcija ${f.pcs} kom` : f.group === 'laz' ? `lazanjera ${LAZ_G} g` : f.group === 'meat' ? f.sub || `${num(f.piece, 1)} g po komadu` : f.group === 'bread' ? `krugova po ${BREAD_PCS} kom` : f.group === 'salad' ? 'zdjela' : '');
 
 let cDraft = null; // nacrt cateringa između forme i pretpregleda; cDraft._ev = radi se za event (Zona 7 / Sala Luma)
 let eDraft = null; // nacrt eventa dok se dodaje catering
@@ -1158,6 +1189,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
   }
   const isCustom = !PACKAGES[c.package] && c.custom && Object.keys(c.custom).some((k) => FOOD[k] && c.custom[k]);
   const custom = c.custom || {};
+  const onIn = (g) => Object.keys(custom).filter((k) => FOOD[k]?.group === g && custom[k]).length; // koliko je jela te skupine uključeno
   // stari zapisi: banjice i dodatno spajamo u opis
   const desc = [c.description, c.platters && `Banjice: ${c.platters}`, c.extras && `Dodatno: ${c.extras}`].filter(Boolean).join('\n');
   V = VENUES[c.venue] || V;
@@ -1178,7 +1210,8 @@ async function renderCateringForm(id, params, venue = 'catering') {
             <div class="section-title">${title}</div>
             <div class="xopts">${Object.entries(FOOD).filter(([, f]) => groups.includes(f.group)).map(([key, f]) => {
               const on = !!custom[key];
-              return switchRow(`it_${key}`, f.name, customSub({ key, ...f }), on, f.group === 'pcs' ? `<span ${on ? '' : 'hidden'} class="stw">${stepper(`por_${key}`, on ? custom[key] : 0, 60)}</span>` : '');
+              const qty = on ? Number(custom[key]) || suggestQty(key, Number(c.people) || 0, onIn(f.group)) : 0;
+              return switchRow(`it_${key}`, f.name, customSub({ key, ...f }), on, STEPPED[f.group] ? `<span ${on ? '' : 'hidden'} class="stw">${stepper(`por_${key}`, qty, 60)}</span>` : '');
             }).join('')}</div>`).join('')}
           <label style="margin-top:14px">Cijena po osobi (€)<input name="price_per_person" inputmode="decimal" value="${esc(c.price_per_person)}" placeholder="koliko naplaćuješ po osobi"></label>
         </div>
@@ -1209,6 +1242,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
         <label>Kada da bude spremno? (kuhinja; ako ne upišeš, ${dom ? '30 min' : '1 h'} prije početka)<input name="ready_time" type="time" value="${esc(c.ready_time?.slice(0, 5))}"></label>
         <label>${dom ? 'Lokacija' : 'Adresa <i class="req">*</i>'}<input name="location" value="${esc(c.location)}" placeholder="${dom ? 'npr. velika sala, terasa' : 'npr. Sala Luma, J.J. Strossmayera 271'}"></label>
         <label>Kontakt<input name="contact" value="${esc(c.contact)}" placeholder="ime i broj mobitela"></label>
+        <label>Naplatiti (€; prazno = po cjeniku paketa)<input name="price" inputmode="decimal" value="${esc(c.price)}" placeholder="dogovorena ukupna cijena"></label>
         <label>Opis i napomene<textarea name="description" style="min-height:120px" placeholder="posebni zahtjevi, alergije, pizze, napomene…">${esc(desc)}</textarea></label>
         <div id="calc"></div>
         <div class="err" id="err"></div>
@@ -1218,18 +1252,19 @@ async function renderCateringForm(id, params, venue = 'catering') {
   const f = document.getElementById('f');
   let items = null;
   // porcije koje je Nevio sam namjestio: u nacrtu ih pamtimo, kod spremljenog zapisa su to one koje odstupaju od prijedloga za spremljeni broj ljudi
-  const touched = new Set(c._touched || Object.keys(custom).filter((k) => FOOD[k]?.group === 'pcs' && custom[k] && Number(custom[k]) !== pcsPor(Number(c.people) || 0, k)).map((k) => `por_${k}`));
+  const touched = new Set(c._touched || Object.keys(custom).filter((k) => STEPPED[FOOD[k]?.group] && Number(custom[k]) > 0 && Number(custom[k]) !== suggestQty(k, Number(c.people) || 0, onIn(FOOD[k].group))).map((k) => `por_${k}`));
   const state = () => {
     const s = {
       venue: c.venue, serving: dom ? (f.elements.serving?.value || 'banjica') : null, package: Number(f.elements.package.value) || null, people: numVal(f, 'people'), cutlery: f.elements.cutlery.checked, plates: f.elements.plates.checked, glasses: f.elements.glasses.checked, ice: f.elements.ice.checked,
       tables: Number(f.elements.tables.value) || 0, bar_tables: Number(f.elements.bar_tables.value) || 0, price_per_person: null, custom: null,
     };
+    const pr = numVal(f, 'price'); s.price = pr != null && !isNaN(pr) ? pr : null;
     if (f.elements.is_custom.checked) {
       s.package = null;
       s.custom = {};
       Object.keys(FOOD).forEach((key) => {
         if (!f.elements[`it_${key}`]?.checked) return;
-        s.custom[key] = FOOD[key].group === 'pcs' ? Math.max(1, Number(f.elements[`por_${key}`].value) || 1) : true;
+        s.custom[key] = STEPPED[FOOD[key].group] ? Math.max(1, Number(f.elements[`por_${key}`].value) || 1) : true;
       });
       const p = numVal(f, 'price_per_person');
       s.price_per_person = p != null && !isNaN(p) ? p : null;
@@ -1242,9 +1277,12 @@ async function renderCateringForm(id, params, venue = 'catering') {
     if (!box) return;
     if ((s.package || s.custom) && !s.people) { box.innerHTML = '<p class="muted small center">Upiši broj ljudi i odmah vidiš što treba kupiti i ponijeti.</p>'; return; }
     const parts = calcParts(costCalc(cateringCalc(s), items));
-    box.innerHTML = parts.take + parts.buy; // prvo brojke (Za ponijeti), pa detalji
+    box.innerHTML = parts.take + parts.pay + parts.buy; // prvo brojke (Za ponijeti), pa naplata, pa detalji
   };
   const setStep = (name, v) => { const inp = f.elements[name]; inp.value = v; document.getElementById(`o_${name}`).textContent = v; };
+  // predložene količine prate broj ljudi i broj uključenih jela dok ih Nevio sam ne namjesti
+  const onCount = (g) => Object.keys(FOOD).filter((k) => FOOD[k].group === g && f.elements[`it_${k}`]?.checked).length;
+  const resuggest = (g) => { const n = numVal(f, 'people') || 0, on = onCount(g); Object.keys(FOOD).filter((k) => FOOD[k].group === g && f.elements[`it_${k}`]?.checked && !touched.has(`por_${k}`)).forEach((k) => setStep(`por_${k}`, suggestQty(k, n, on))); };
   f.addEventListener('click', (e) => {
     const sv = e.target.closest('[data-serv]');
     if (sv) {
@@ -1283,19 +1321,13 @@ async function renderCateringForm(id, params, venue = 'catering') {
     } else if (t.name.startsWith('it_')) {
       const key = t.name.slice(3);
       const wrap = t.parentElement.querySelector('.stw');
-      if (wrap) {
-        wrap.hidden = !t.checked;
-        if (t.checked && !touched.has(`por_${key}`)) setStep(`por_${key}`, pcsPor(numVal(f, 'people') || 0, key));
-      }
+      if (wrap) { wrap.hidden = !t.checked; resuggest(FOOD[key].group); }
     }
     redraw();
   });
-  f.people.addEventListener('input', () => {
-    // predložene porcije prate broj ljudi dok ih Nevio sam ne namjesti
-    Object.keys(FOOD).filter((k) => FOOD[k].group === 'pcs').forEach((k) => { if (f.elements[`it_${k}`].checked && !touched.has(`por_${k}`)) setStep(`por_${k}`, pcsPor(numVal(f, 'people') || 0, k)); });
-    redraw();
-  });
+  f.people.addEventListener('input', () => { Object.keys(STEPPED).forEach(resuggest); redraw(); });
   f.price_per_person.addEventListener('input', redraw);
+  f.price.addEventListener('input', redraw);
   // "spremno" prati početak dok ga korisnik sam ne upiše: catering 1 h prije (utovar i put), domjenak 30 min
   let readyAuto = !f.ready_time.value;
   f.ready_time.addEventListener('input', () => { readyAuto = !f.ready_time.value; });
@@ -1319,7 +1351,7 @@ async function renderCateringForm(id, params, venue = 'catering') {
       people: s.people, location: val(f, 'location'), contact: val(f, 'contact'),
       description: val(f, 'description'), platters: null, extras: null,
       package: s.package, custom: s.custom, price_per_person: s.price_per_person, cutlery: s.cutlery, plates: s.plates, glasses: s.glasses, ice: s.ice, tables: s.tables, bar_tables: s.bar_tables,
-      price: c.price ?? null, serving: s.serving,
+      price: s.price, serving: s.serving,
     };
     if (id) {
       // postojeći catering se sprema odmah, pretpregled je samo kod prvog dodavanja
@@ -1399,6 +1431,7 @@ async function renderEventDetail(venue, id) {
     const k = cat ? cateringCalc(cat) : null;
     const info = [
       e.contact && [ICON.phone, 'Kontakt', telLink(e.contact)],
+      e.price != null && [ICON.chart || ICON.note, 'Naplatiti', eur(e.price)],
       e.description && [ICON.note, 'Napomene', esc(e.description)],
     ].filter(Boolean);
     screen({
@@ -1459,7 +1492,7 @@ async function renderEventForm(venue, id, params) {
           <label>Do kada (npr. 03:00)<input name="end_time" type="time" value="${esc(e.end_time?.slice(0, 5))}"></label>
         </div>
         <label>Kontakt<input name="contact" value="${esc(e.contact)}" placeholder="ime i broj mobitela"></label>
-        <label>Dogovorena cijena (€, za statistiku)<input name="price" inputmode="decimal" value="${esc(e.price)}" placeholder="npr. 1500"></label>
+        <label>Naplatiti (€)<input name="price" inputmode="decimal" value="${esc(e.price)}" placeholder="dogovorena cijena, npr. 1500"></label>
         <label>Napomene<textarea name="description" placeholder="torta, glazba, posebne želje…">${esc(e.description)}</textarea></label>
         <div class="ftitle">Catering</div>
         <div id="catbox">
@@ -1776,6 +1809,17 @@ const reviewLine = (l) => {
   if (per && per.unit === unit) price = per.price_net; else if (l.unit !== unit && per) price = per.price_net;
   return { ...l, include: true, item_id: m ? m.item_id : '', new_name: m ? m.item_name : l.name, new_unit: unit, new_price: price != null ? +Number(price).toFixed(4) : null, new_vat: l.vat_rate_used ?? l.vat_rate ?? 25, old_price: m ? m.price_net : null, old_unit: m ? m.unit : null };
 };
+// "METRO Cash & Carry" ~ Metro, "LIMBO d.o.o." ~ Limbo: bez kvačica i velikih slova, pa po prvoj riječi
+const matchSupplier = (sups, store) => {
+  const clean = (x) => norm(x).replace(/\bj?d\.?o\.?o\.?\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+  const st = clean(store);
+  if (!st) return null;
+  const first = st.split(' ')[0];
+  return sups.find((x) => { const n = clean(x.name); return n && (st.includes(n) || n.includes(st)); })
+    || (first.length >= 3 ? sups.find((x) => clean(x.name).split(' ')[0] === first) : null)
+    || null;
+};
+const NEW_SUP = '__new__';
 async function renderReceiptReview(id) {
   const admin = isAdmin();
   const back = rDraft?.back || (admin ? '/racuni' : '/');
@@ -1789,16 +1833,20 @@ async function renderReceiptReview(id) {
     if (stale(my)) return;
     const lines = (r.lines || []).map((l) => (l.new_name !== undefined ? l : reviewLine(l)));
     const readOnly = r.status === 'applied' || r.status === 'rejected';
-    const byStore = sups.find((s) => r.store && norm(r.store).includes(norm(s.name)));
-    let supplierId = r.supplier_id || byStore?.id || '';
-    const supOpt = sups.map((s) => `<option value="${s.id}" ${s.id === supplierId ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-    const itemOpt = (sel) => `<option value="">Novi artikl</option>${items.map((i) => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.price_net != null ? ` · ${eur(i.price_net)}/${esc(i.unit)}` : ''}</option>`).join('')}`;
+    // dobavljač s računa (Nevio 2026-10-17): postojeći po nazivu, inače se predlaže novi s nazivom s računa
+    const byStore = matchSupplier(sups, r.store);
+    const supplierId = r.supplier_id || byStore?.id || (r.store ? NEW_SUP : '');
+    const supOpt = `${r.store && !byStore && !r.supplier_id ? `<option value="${NEW_SUP}" selected>Novi dobavljač: ${esc(r.store)}</option>` : ''}${sups.map((s) => `<option value="${s.id}" ${s.id === supplierId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}`;
+    // artikli se nude samo od odabranog dobavljača: stavka s računa ne smije promijeniti cijenu artikla drugog dobavljača
+    const itemSup = (iid) => items.find((i) => i.id === iid)?.supplier_id || null;
+    const itemOpt = (sel, sid) => `<option value="">Novi artikl</option>${items.filter((i) => sid && i.supplier_id === sid).map((i) => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.price_net != null ? ` · ${eur(i.price_net)}/${esc(i.unit)}` : ''}</option>`).join('')}`;
+    if (admin && !readOnly) lines.forEach((l, i) => { if (l.item_id && itemSup(l.item_id) !== supplierId) lines[i] = reviewLine({ ...l, match: null }); });
     const onReceipt = (l) => [l.qty != null && `${num(l.qty, l.unit === 'kg' || l.unit === 'l' ? 3 : 0)} ${l.unit}`, l.unit_price_gross != null && `× ${eur(l.unit_price_gross)}`, l.pack && `(${num(l.pack.size, 2)} ${l.pack.unit})`, l.total != null && `= ${eur(l.total)}`, `PDV ${l.new_vat} %`].filter(Boolean).join(' ');
     const row = (l, i) => `
       <div class="rline ${l.include ? '' : 'off'}" data-i="${i}">
         <label class="rtop"><input type="checkbox" class="sw" name="inc_${i}" ${l.include ? 'checked' : ''} ${readOnly ? 'disabled' : ''}><span class="rname">${esc(l.name)}<small>${esc(onReceipt(l))}</small></span></label>
         <div class="rbody">
-          ${admin && !readOnly ? `<label>Artikl u Nabavci<select name="item_${i}">${itemOpt(l.item_id)}</select></label>` : `<div class="muted small">${l.item_id ? `Postojeći artikl: ${esc(l.new_name)}` : 'Novi artikl'}</div>`}
+          ${admin && !readOnly ? `<label>Artikl u Nabavci<select name="item_${i}">${itemOpt(l.item_id, supplierId)}</select></label>` : `<div class="muted small">${l.item_id ? `Postojeći artikl: ${esc(l.new_name)}` : 'Novi artikl'}</div>`}
           <label ${l.item_id ? 'hidden' : ''} data-newname>Naziv novog artikla<input name="name_${i}" value="${esc(l.new_name)}" ${readOnly ? 'disabled' : ''}></label>
           <div class="grid2">
             <label>Cijena bez PDV-a (€)<input name="price_${i}" inputmode="decimal" value="${l.new_price != null ? esc(num(l.new_price, 4).replace(/0+$/, '').replace(/[.,]$/, '')) : ''}" ${readOnly ? 'disabled' : ''}></label>
@@ -1815,7 +1863,11 @@ async function renderReceiptReview(id) {
           <div class="hero">
             <div class="bigdate">${esc(r.store || 'Račun')}</div>
             <div class="muted">${[r.receipt_date || r.date ? fmtDateShort(r.receipt_date || r.date) : '', r.total != null ? `ukupno ${eur(r.total)}` : '', r.scanner?.full_name ? `slikao ${esc(r.scanner.full_name)}` : '', r.created_at ? fmtStamp(r.created_at) : ''].filter(Boolean).join(' · ')}</div>
-            ${admin && !readOnly ? `<label style="margin-top:12px">Dobavljač za nove artikle<select id="sup"><option value="">— odaberi —</option>${supOpt}</select></label>` : ''}
+            ${admin && !readOnly ? `<label style="margin-top:12px">Dobavljač<select id="sup"><option value="">— odaberi —</option>${supOpt}</select></label>
+            <div id="newsup" ${supplierId === NEW_SUP ? '' : 'hidden'}>
+              <label>Naziv novog dobavljača<input id="supname" value="${esc(r.store || '')}" placeholder="kako će se zvati u Nabavci"></label>
+              <label>Kategorija<select id="supcat">${Object.entries(NCATS).map(([k, c]) => `<option value="${k}">${esc(c.name)}</option>`).join('')}</select></label>
+            </div>` : ''}
             ${!admin ? '<p class="muted small" style="margin:10px 0 0">Provjeri stavke i cijene pa pošalji adminu. Cijene se mijenjaju tek kad admin potvrdi.</p>' : ''}
           </div>
           <div class="section-title">Stavke s računa · ${lines.length}</div>
@@ -1833,6 +1885,18 @@ async function renderReceiptReview(id) {
       if (t.name.startsWith('inc_')) box.classList.toggle('off', !t.checked);
       if (t.name.startsWith('item_')) { const nn = box.querySelector('[data-newname]'); nn.hidden = !!t.value; }
     });
+    const supSel = document.getElementById('sup');
+    if (supSel) supSel.addEventListener('change', () => {
+      // drugi dobavljač: ponudi njegove artikle, stavke koje mu ne pripadaju postaju novi artikli s nazivom s računa
+      const sid = supSel.value;
+      document.getElementById('newsup').hidden = sid !== NEW_SUP;
+      f.querySelectorAll('select[name^=item_]').forEach((sel) => {
+        const box = sel.closest('.rline'), i = Number(box.dataset.i), keep = itemSup(sel.value) === sid ? sel.value : '';
+        sel.innerHTML = itemOpt(keep, sid);
+        box.querySelector('[data-newname]').hidden = !!keep;
+        if (!keep) f.elements[`name_${i}`].value = lines[i].name;
+      });
+    });
     const collect = () => lines.map((l, i) => {
       const inc = f.elements[`inc_${i}`].checked;
       const item_id = admin ? f.elements[`item_${i}`].value : l.item_id;
@@ -1848,15 +1912,25 @@ async function renderReceiptReview(id) {
       if (!use.length) { err.textContent = 'Nijedna stavka nije uključena.'; return; }
       const bad = use.find((l) => l.new_price == null || isNaN(l.new_price) || l.new_price < 0);
       if (bad) { err.textContent = `Upiši cijenu za: ${bad.name}`; return; }
-      const sup = admin ? document.getElementById('sup').value : null;
-      if (admin && use.some((l) => !l.item_id) && !sup) { err.textContent = 'Odaberi dobavljača za nove artikle.'; return; }
+      let sup = admin ? supSel.value : null;
+      if (admin && !sup) { err.textContent = 'Odaberi dobavljača ili ostavi novog s računa.'; return; }
+      const newName = sup === NEW_SUP ? document.getElementById('supname').value.trim() : '';
+      if (sup === NEW_SUP && !newName) { err.textContent = 'Upiši naziv novog dobavljača.'; return; }
       const btn = document.getElementById('ok'); btn.disabled = true;
       try {
-        const head = { supplier_id: sup || r.supplier_id || null, store: r.store || null, receipt_date: r.receipt_date || r.date || null, total: r.total ?? null, lines: compact(ls) };
         if (!admin) {
+          const head = { supplier_id: r.supplier_id || null, store: r.store || null, receipt_date: r.receipt_date || r.date || null, total: r.total ?? null, lines: compact(ls) };
           await q(sb.from('receipts').insert({ ...head, status: 'pending' }));
           rDraft = null; flushPush(); toast('Poslano adminu na potvrdu'); go('/'); return;
         }
+        let created = null;
+        if (sup === NEW_SUP) {
+          // dobavljača s računa još nema u Nabavci: napravi ga, artikli idu pod njega
+          const cat = document.getElementById('supcat').value || 'food';
+          created = { name: newName, categories: [cat], ...(await q(sb.from('suppliers').insert({ name: newName, categories: [cat] }).select('id, name, categories').single())) };
+          sups.push(created); sup = created.id;
+        }
+        const head = { supplier_id: sup, store: r.store || null, receipt_date: r.receipt_date || r.date || null, total: r.total ?? null, lines: compact(ls) };
         let upd = 0, ins = 0;
         const supRow = sups.find((s) => s.id === sup);
         for (const l of use) {
@@ -1866,7 +1940,7 @@ async function renderReceiptReview(id) {
         const done = { ...head, status: 'applied', applied_at: new Date().toISOString(), applied_by: me.id };
         if (id) await q(sb.from('receipts').update(done).eq('id', id)); else await q(sb.from('receipts').insert(done));
         rDraft = null;
-        toast(`Ažurirano ${upd} ${plural(upd, 'cijena', 'cijene', 'cijena')}, dodano ${ins} ${plural(ins, 'artikl', 'artikla', 'artikala')}`);
+        toast(`${created ? `Dodan dobavljač ${created.name}, ` : ''}ažurirano ${upd} ${plural(upd, 'cijena', 'cijene', 'cijena')}, dodano ${ins} ${plural(ins, 'artikl', 'artikla', 'artikala')}`);
         go(id ? '/racuni' : back);
       } catch (e2) { err.textContent = errText(e2); btn.disabled = false; }
     };
